@@ -1,6 +1,7 @@
+// tsconfig.json
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "ES2022",
     "lib": [
       "dom",
       "dom.iterable",
@@ -10,20 +11,21 @@
     "skipLibCheck": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "noEmit": true,
     "jsx": "preserve",
-    "incremental": true,
-    "baseUrl": "src",
+    // If you want @/ as an alias:
+    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "*"
+        "src/*"
       ]
     },
+    "incremental": true,
+    "esModuleInterop": true,
     "plugins": [
       {
         "name": "next"
@@ -31,7 +33,9 @@
     ]
   },
   "include": [
-    "src",
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": [
