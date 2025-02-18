@@ -1,5 +1,5 @@
+import "./globals.css";
 import Navbar from "@/components/Navbar";
-import "./globals.css"
 
 export default function RootLayout({
   children,
@@ -8,9 +8,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-black text-white">
+      <body className="bg-black text-white flex flex-col items-center justify-center min-h-screen">
         <Navbar />
-        {children}
+        <main className="w-full flex flex-col items-center justify-center">
+          {children}
+        </main>
       </body>
     </html>
   );

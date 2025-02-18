@@ -1,12 +1,17 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",  // Ensure it scans the app directory
-    "./components/**/*.{js,ts,jsx,tsx}",  // Scan components folder
-    "./styles/**/*.{js,ts,jsx,tsx}",  // If you have extra styles
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",  // Scan Next.js pages & layouts
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",  // Scan components
+    "./styles/**/*.{js,ts,jsx,tsx,mdx}"  // Scan additional styles
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+      },
+    },
   },
   plugins: [],
 };
