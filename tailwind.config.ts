@@ -1,10 +1,10 @@
 import type { Config } from "tailwindcss";
 
-export default {
+const config: Config = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",  // Scans all Next.js pages & layouts
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",  // Scans components
+    "./styles/**/*.{js,ts,jsx,tsx,mdx}",  // If you have extra styles
   ],
   theme: {
     extend: {
@@ -15,4 +15,6 @@ export default {
     },
   },
   plugins: [],
-} satisfies Config;
+};
+
+export default config;
