@@ -1,31 +1,27 @@
-// src/app/layout.tsx
-import "./globals.css";           // Import your global styles
-import Navbar from "@/components/Navbar";
+"use client";
+import { ReactNode, useEffect, useState } from "react";
 import ConnectingDots from "@/components/ConnectingDots";
+import Navbar from "@/components/Navbar";
+import "@/app/globals.css";
 
-export const metadata = {
-  title: "Dinesh Portfolio",
-  description: "My personal portfolio website",
-};
+export default function RootLayout({ children }: { children: ReactNode }) {
+  const [showNavbar, setShowNavbar] = useState(false);
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowNavbar(window.scrollY > window.innerHeight * 0.8); // Navbar appears after scrolling
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <html lang="en">
-      <body className="bg-black text-white min-h-screen relative overflow-hidden">
-        {/* Your existing Navbar (client component) */}
-        <Navbar />
-
-        {/* The connecting-dots effect behind everything */}
+      <body>
+        {showNavbar && <Navbar />}
         <ConnectingDots />
-
-        {/* The main area where page.tsx content goes */}
-        <main className="w-full flex flex-col items-center justify-center">
-          {children}
-        </main>
+        <main>{children}</main>
       </body>
     </html>
   );
