@@ -16,6 +16,7 @@ body {
   color: var(--text-color);
   font-family: "Inter", sans-serif;
   overflow-x: hidden;
+  overflow-y: scroll; /* ✅ Always show scrollbar to prevent layout shift */
   margin: 0;
   padding: 0;
 }
