@@ -31,7 +31,7 @@ export default function ConnectingDots() {
 
     // Connecting dots
     const connectingDots: Dot[] = [];
-    const numConnectingDots = 300;
+    const numConnectingDots = 450;
     for (let i = 0; i < numConnectingDots; i++) {
       connectingDots.push({
         x: randomInRange(0, width),
@@ -58,7 +58,7 @@ export default function ConnectingDots() {
     }
 
     // Configuration settings
-    const visibleRadius = 350; // Defines interaction radius
+    const visibleRadius = 600; // Defines interaction radius
     const cursorConnectionDistance = 150; // Connects dots directly to cursor
     const dotConnectionDistance = 120; // Connects dots only **if** first linked to cursor
 
