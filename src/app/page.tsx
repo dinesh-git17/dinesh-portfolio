@@ -1,14 +1,17 @@
-// src/app/page.tsx
-"use client"; // We want the hero to be interactive if needed
+"use client";
 import Hero from "@/components/Hero";
 import AboutMe from "@/components/AboutMe";
+import ContactPage from "@/components/Contact";
+import SectionDivider from "@/components/SectionDivider"; // Import the divider
 
 export default function Home() {
   return (
     <>
       <Hero />
+      <SectionDivider />
       <AboutMe />
-      {/* Additional sections can go here */}
+      <SectionDivider />
+      <ContactPage />
     </>
   );
 }

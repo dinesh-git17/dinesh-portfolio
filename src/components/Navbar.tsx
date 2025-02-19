@@ -24,7 +24,7 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Smooth scrolling function
+  // Improved Smooth Scrolling Function
   const handleScroll = (
     event: React.MouseEvent<HTMLAnchorElement, MouseEvent>,
     targetId: string
@@ -32,7 +32,10 @@ export default function Navbar() {
     event.preventDefault();
     const targetElement = document.getElementById(targetId);
     if (targetElement) {
-      window.scrollTo({ top: targetElement.offsetTop, behavior: "smooth" });
+      targetElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
   };
 
@@ -68,6 +71,7 @@ export default function Navbar() {
           <li className="group">
             <a
               href="#projects"
+              onClick={(e) => handleScroll(e, "projects")}
               className="transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
             >
               Projects
@@ -77,6 +81,7 @@ export default function Navbar() {
           <li className="group">
             <a
               href="#contact"
+              onClick={(e) => handleScroll(e, "contact")}
               className="transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
             >
               Contact
