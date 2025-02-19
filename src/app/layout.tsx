@@ -1,27 +1,26 @@
-"use client";
-import { ReactNode, useEffect, useState } from "react";
-import ConnectingDots from "@/components/ConnectingDots";
-import Navbar from "@/components/Navbar";
-import "@/app/globals.css";
+// src/app/layout.tsx
+import "./globals.css";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import ConnectingDots from "@/components/ConnectingDots"; // Import effect
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-  const [showNavbar, setShowNavbar] = useState(false);
+const inter = Inter({ subsets: ["latin"] });
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowNavbar(window.scrollY > window.innerHeight * 0.8); // Navbar appears after scrolling
-    };
+export const metadata: Metadata = {
+  title: "Dinesh Dawonauth - Portfolio",
+  description: "Data Scientist | Machine Learning Enthusiast | Portfolio",
+};
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        {showNavbar && <Navbar />}
+      <head />
+      <body className={`${inter.className} bg-[#1C1C28] text-white`}>
+        {/* Connecting Dots Background */}
         <ConnectingDots />
-        <main>{children}</main>
+
+        {/* Main Content */}
+        <main className="relative z-10">{children}</main>
       </body>
     </html>
   );
