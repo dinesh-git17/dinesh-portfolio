@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { FaBars, FaUserAstronaut } from "react-icons/fa";
+import { FaBars, FaUserAstronaut, FaGamepad } from "react-icons/fa";
 
 export default function Navbar() {
   const [isVisible, setIsVisible] = useState(false);
@@ -85,6 +85,16 @@ export default function Navbar() {
               className="transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
             >
               Contact
+              <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
+            </a>
+          </li>
+          <li className="group">
+            <a
+              href="/flappy-bird"
+              className="flex items-center gap-1 transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
+            >
+              <FaGamepad className="text-purple-400" />
+              Play Game
               <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
             </a>
           </li>
