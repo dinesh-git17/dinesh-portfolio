@@ -6,7 +6,9 @@ module.exports = {
     "./src/styles/**/*.{js,ts,jsx,tsx,mdx}"
   ],
   theme: {
-    extend: {},
+    extend: {fontFamily: {
+        sans: ["Inter", "sans-serif"], // Set Inter as the default font
+      },},
   },
   plugins: [],
 };

@@ -58,7 +58,7 @@ export default function ConnectingDots() {
     }
 
     // Configuration settings
-    const visibleRadius = 250; // Defines interaction radius
+    const visibleRadius = 350; // Defines interaction radius
     const cursorConnectionDistance = 150; // Connects dots directly to cursor
     const dotConnectionDistance = 120; // Connects dots only **if** first linked to cursor
 

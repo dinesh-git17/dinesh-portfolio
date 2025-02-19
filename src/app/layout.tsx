@@ -3,6 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import ConnectingDots from "@/components/ConnectingDots"; // Import effect
+import Navbar from "@/components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head />
       <body className={`${inter.className} bg-[#1C1C28] text-white`}>
         {/* Connecting Dots Background */}
+        <Navbar />
         <ConnectingDots />
 
         {/* Main Content */}
