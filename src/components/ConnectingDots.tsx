@@ -31,7 +31,7 @@ export default function ConnectingDots() {
 
     // Connecting dots
     const connectingDots: Dot[] = [];
-    const numConnectingDots = 450;
+    const numConnectingDots = 400;
     for (let i = 0; i < numConnectingDots; i++) {
       connectingDots.push({
         x: randomInRange(0, width),
@@ -39,13 +39,13 @@ export default function ConnectingDots() {
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
         radius: randomInRange(2, 3),
-        color: "rgba(80, 220, 255, 0.9)", // Futuristic cyan glow
+        color: "rgba(160, 32, 240, 0.9)", // Futuristic space purple
       });
     }
 
-    // Floating dots (Matte colors for AI aesthetic)
+    // Floating dots
     const floatingDots: Dot[] = [];
-    const numFloatingDots = 45;
+    const numFloatingDots = 40;
     for (let i = 0; i < numFloatingDots; i++) {
       floatingDots.push({
         x: randomInRange(0, width),
@@ -53,14 +53,18 @@ export default function ConnectingDots() {
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
         radius: randomInRange(2, 4),
-        color: Math.random() > 0.5 ? "rgba(255, 99, 132, 0.8)" : "rgba(54, 162, 235, 0.8)", // Matte red & blue
+        color:
+          Math.random() > 0.5
+            ? "rgba(128, 0, 128, 0.8)"
+            : "rgba(75, 0, 130, 0.8)", // Deep purple hues
       });
     }
 
     // Configuration settings
-    const visibleRadius = 600; // Defines interaction radius
-    const cursorConnectionDistance = 150; // Connects dots directly to cursor
-    const dotConnectionDistance = 120; // Connects dots only **if** first linked to cursor
+    const visibleRadius = 500;
+    const cursorConnectionDistance = 120;
+    const dotConnectionDistance = 90;
+    const minDotConnectionDistance = 30;
 
     const animate = () => {
       ctx.clearRect(0, 0, width, height);
@@ -73,7 +77,7 @@ export default function ConnectingDots() {
         if (dot.y < 0 || dot.y > height) dot.vy = -dot.vy;
       });
 
-      // Draw floating dots (Always visible)
+      // Draw floating dots
       floatingDots.forEach((dot) => {
         ctx.beginPath();
         ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
@@ -83,7 +87,10 @@ export default function ConnectingDots() {
 
       // Filter connecting dots within the mouse area
       const dotsLinkedToCursor = connectingDots.filter((dot) => {
-        return Math.hypot(dot.x - mouse.current.x, dot.y - mouse.current.y) < visibleRadius;
+        return (
+          Math.hypot(dot.x - mouse.current.x, dot.y - mouse.current.y) <
+          visibleRadius
+        );
       });
 
       // Draw connections from the cursor only
@@ -93,7 +100,7 @@ export default function ConnectingDots() {
           ctx.beginPath();
           ctx.moveTo(mouse.current.x, mouse.current.y);
           ctx.lineTo(dot.x, dot.y);
-          ctx.strokeStyle = `rgba(80, 220, 255,${1 - d / cursorConnectionDistance})`;
+          ctx.strokeStyle = `rgba(160, 32, 240,${1 - d / cursorConnectionDistance})`;
           ctx.lineWidth = 1.2;
           ctx.stroke();
         }
@@ -103,7 +110,7 @@ export default function ConnectingDots() {
       dotsLinkedToCursor.forEach((dot) => {
         ctx.beginPath();
         ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(80, 220, 255, 0.8)`;
+        ctx.fillStyle = `rgba(160, 32, 240, 0.8)`;
         ctx.fill();
       });
 
@@ -113,11 +120,11 @@ export default function ConnectingDots() {
           const dotA = dotsLinkedToCursor[i];
           const dotB = dotsLinkedToCursor[j];
           const dist = Math.hypot(dotA.x - dotB.x, dotA.y - dotB.y);
-          if (dist < dotConnectionDistance) {
+          if (dist < dotConnectionDistance && dist > minDotConnectionDistance) {
             ctx.beginPath();
             ctx.moveTo(dotA.x, dotA.y);
             ctx.lineTo(dotB.x, dotB.y);
-            ctx.strokeStyle = `rgba(80, 220, 255,${1 - dist / dotConnectionDistance})`;
+            ctx.strokeStyle = `rgba(160, 32, 240,${1 - dist / dotConnectionDistance})`;
             ctx.lineWidth = 0.8;
             ctx.stroke();
           }

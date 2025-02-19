@@ -4,17 +4,17 @@
 
 :root {
   --background-color: #0d0d19;
-  --primary-color: #9457EB;
-  --accent-color: #57EBE1;
+  --primary-color: #9457eb;
+  --accent-color: #57ebe1;
   --text-color: #ffffff;
-  --matte-red: #EB5757;
-  --matte-blue: #57EBE1;
+  --matte-red: #eb5757;
+  --matte-blue: #57ebe1;
 }
 
 body {
   background: var(--background-color);
   color: var(--text-color);
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   overflow-x: hidden;
   margin: 0;
   padding: 0;

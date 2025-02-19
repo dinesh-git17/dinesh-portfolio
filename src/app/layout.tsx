@@ -12,14 +12,22 @@ export const metadata: Metadata = {
   description: "Data Scientist | Machine Learning Enthusiast | Portfolio",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <head />
       <body className={`${inter.className} bg-[#1C1C28] text-white`}>
-        {/* Connecting Dots Background */}
+        {/* Navbar should be the highest layer */}
         <Navbar />
-        <ConnectingDots />
+
+        {/* Connecting Dots Effect (Behind Everything) */}
+        <div className="absolute inset-0 z-0">
+          <ConnectingDots />
+        </div>
 
         {/* Main Content */}
         <main className="relative z-10">{children}</main>

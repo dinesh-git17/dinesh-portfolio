@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { FaBars, FaUserAstronaut } from "react-icons/fa";
 
 export default function Navbar() {
   const [isVisible, setIsVisible] = useState(false);
@@ -12,7 +13,6 @@ export default function Navbar() {
       const aboutPosition = aboutSection.getBoundingClientRect().top;
       const windowHeight = window.innerHeight;
 
-      // Show navbar when about section is in view
       if (aboutPosition < windowHeight * 0.5) {
         setIsVisible(true);
       } else {
@@ -24,19 +24,71 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Smooth scrolling function
+  const handleScroll = (
+    event: React.MouseEvent<HTMLAnchorElement, MouseEvent>,
+    targetId: string
+  ) => {
+    event.preventDefault();
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      window.scrollTo({ top: targetElement.offsetTop, behavior: "smooth" });
+    }
+  };
+
   return (
     <nav
-      className={`fixed top-0 w-full px-6 py-4 backdrop-blur-md transition-opacity duration-500 ${
-        isVisible ? "opacity-100 bg-black/100" : "opacity-0"
+      className={`fixed top-0 w-full px-6 py-4 transition-opacity duration-500 font-inter z-50 ${
+        isVisible
+          ? "opacity-100 bg-[#0A0A0F]/80 backdrop-blur-lg shadow-lg"
+          : "opacity-0"
       }`}
     >
       <div className="max-w-6xl mx-auto flex justify-between items-center">
-        <h1 className="text-xl font-bold text-white">Dinesh&apos;s Portfolio</h1>
-        <ul className="flex space-x-6 text-white">
-          <li><a href="#about" className="hover:text-blue-400">About</a></li>
-          <li><a href="#projects" className="hover:text-blue-400">Projects</a></li>
-          <li><a href="#contact" className="hover:text-blue-400">Contact</a></li>
+        {/* 🚀 Clickable Astronaut Icon (Scrolls to Top) */}
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="hover:text-purple-400 transition duration-300"
+        >
+          <FaUserAstronaut className="text-purple-400 text-2xl md:text-3xl" />
+        </button>
+
+        {/* Navbar Links */}
+        <ul className="hidden md:flex space-x-8 text-white text-sm uppercase tracking-wide">
+          <li className="group">
+            <a
+              href="#about"
+              onClick={(e) => handleScroll(e, "about")}
+              className="transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
+            >
+              About
+              <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
+            </a>
+          </li>
+          <li className="group">
+            <a
+              href="#projects"
+              className="transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
+            >
+              Projects
+              <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
+            </a>
+          </li>
+          <li className="group">
+            <a
+              href="#contact"
+              className="transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
+            >
+              Contact
+              <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
+            </a>
+          </li>
         </ul>
+
+        {/* Mobile Menu Icon */}
+        <div className="md:hidden">
+          <FaBars className="text-white text-xl cursor-pointer hover:text-purple-400 transition duration-300" />
+        </div>
       </div>
     </nav>
   );
