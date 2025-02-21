@@ -92,16 +92,32 @@ export default function FlappyBirdGame() {
     function gameLoop() {
       if (!running || !ctx || !canvas || !rocketImg.current) return;
 
-      // ✅ Always clear the canvas to prevent ghosting
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#0A0A0F";
+      // ✅ Apply the same gradient background as the Game Over screen
+      const backgroundGradient = ctx.createLinearGradient(
+        0,
+        0,
+        0,
+        canvas.height
+      );
+      backgroundGradient.addColorStop(0, "#1e1e2e");
+      backgroundGradient.addColorStop(0.4, "#15131a");
+      backgroundGradient.addColorStop(1, "#0A0A0F");
+
+      ctx.fillStyle = backgroundGradient; // ✅ Apply matching background
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // ✅ Draw Score Directly on the Canvas
-      ctx.fillStyle = "#FFD700"; // ✅ Gold color for high visibility
-      ctx.font = "bold 28px Inter"; // ✅ Matches website font
+      // ✅ Draw Score with Modern UI Styling
+      const gradient = ctx.createLinearGradient(20, 0, 200, 0);
+      gradient.addColorStop(0, "#8b5cf6"); // Purple
+      gradient.addColorStop(0.5, "#ec4899"); // Pink
+      gradient.addColorStop(1, "#3b82f6"); // Blue
+
+      ctx.fillStyle = gradient; // ✅ Gradient color effect
+      ctx.font = "bold 20px 'Inter', sans-serif"; // ✅ Uses website font
       ctx.textAlign = "left";
-      ctx.fillText(`Score: ${scoreRef.current}`, 20, 40); // ✅ Draws score at top-left
+      ctx.shadowColor = "rgba(255, 255, 255, 0.4)"; // ✅ Adds a soft glow effect
+      ctx.shadowBlur = 8;
+      ctx.fillText(`Score: ${scoreRef.current}`, 20, 50); // ✅ Adjusted positioning for better alignment
 
       // ✅ Stop rendering objects when Game Over
       if (gameOver) return; // ✅ Prevents further drawing
