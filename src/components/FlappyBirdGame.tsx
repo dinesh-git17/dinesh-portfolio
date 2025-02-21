@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
+import FloatingDots from "@/components/FloatingDots";
 
 // ✅ Define Pipe Type
 type Pipe = {
@@ -22,6 +23,7 @@ export default function FlappyBirdGame() {
   const rocketAngleRef = useRef(0);
   const [highScore, setHighScore] = useState(0); // ✅ High Score State
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false); // ✅ For smooth fade transition
 
   const gravity = 0.5;
   const pipeWidth = 60;
@@ -56,16 +58,16 @@ export default function FlappyBirdGame() {
     rocketAngleRef.current = 0.3;
   }, [gameRunning, gameOver]);
 
-  // ✅ Reset Game Function
   const resetGame = useCallback(() => {
-    let newHighScore = highScore;
+    setGameOver(false);
+    setGameRunning(true);
 
-    // ✅ Ensure High Score updates BEFORE setting game over state
-    if (scoreRef.current > highScore) {
-      newHighScore = scoreRef.current;
-      setHighScore(newHighScore);
+    // ✅ Ensure High Score updates BEFORE resetting the game
+    setHighScore((prevHighScore) => {
+      const newHighScore = Math.max(prevHighScore, scoreRef.current);
       localStorage.setItem("highScore", newHighScore.toString());
-    }
+      return newHighScore;
+    });
 
     // ✅ Reset game state
     birdYRef.current = 250;
@@ -74,9 +76,7 @@ export default function FlappyBirdGame() {
     scoreRef.current = 0;
     setScore(0);
     rocketAngleRef.current = 0;
-    setGameOver(false);
-    setGameRunning(true);
-  }, [highScore]);
+  }, []);
 
   // ✅ Game Loop
   useEffect(() => {
@@ -96,6 +96,12 @@ export default function FlappyBirdGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#0A0A0F";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // ✅ Draw Score Directly on the Canvas
+      ctx.fillStyle = "#FFD700"; // ✅ Gold color for high visibility
+      ctx.font = "bold 28px Inter"; // ✅ Matches website font
+      ctx.textAlign = "left";
+      ctx.fillText(`Score: ${scoreRef.current}`, 20, 40); // ✅ Draws score at top-left
 
       // ✅ Stop rendering objects when Game Over
       if (gameOver) return; // ✅ Prevents further drawing
@@ -150,7 +156,7 @@ export default function FlappyBirdGame() {
             canvas.height - pipe.height - pipeGap
           );
 
-          // ✅ Collision Detection (Ensures Smooth Transition to Game Over)
+          // collision detection
           if (
             (rocketX + 15 > pipe.x &&
               rocketX - 15 < pipe.x + pipeWidth &&
@@ -160,23 +166,25 @@ export default function FlappyBirdGame() {
           ) {
             running = false;
             setGameRunning(false);
-            setIsTransitioning(true); // ✅ Prevents the button from showing too early
+            setIsTransitioning(true); // ✅ Prevents glitches
+            setIsFadingOut(true); // ✅ Start the fade-out effect
 
             // ✅ Stop Game Rendering Immediately
             pipesRef.current = [];
 
-            // ✅ Force Full Canvas Clear (No Leftover Pipes)
-            requestAnimationFrame(() => {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.fillStyle = "#0A0A0F";
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // ✅ Ensure High Score Updates BEFORE setting Game Over
+            setHighScore((prevHighScore) => {
+              const newHighScore = Math.max(prevHighScore, scoreRef.current);
+              localStorage.setItem("highScore", newHighScore.toString());
+              return newHighScore;
             });
 
-            // ✅ Pause for a brief moment before showing Game Over (Smooth Transition)
+            // ✅ Delay the Game Over screen appearance (Smooth Transition)
             setTimeout(() => {
               setGameOver(true);
-              setIsTransitioning(false); // ✅ Re-enable button only when transition is complete
-            }, 500); // ✅ 500ms pause prevents an instant jump
+              setIsFadingOut(false); // ✅ Reset fade state
+              setIsTransitioning(false);
+            }, 800); // ✅ 800ms delay ensures a smooth transition
           }
 
           // ✅ Score Update
@@ -233,64 +241,118 @@ export default function FlappyBirdGame() {
   }, [gameRunning, gameOver, jump]);
 
   return (
-    <div className="flex flex-col items-center relative">
-      <canvas
-        ref={canvasRef}
-        width={400}
-        height={500}
-        className="border border-purple-500 rounded-lg shadow-xl"
-      />
+    <div className="relative w-full min-h-screen flex flex-col items-center justify-center bg-inherit text-inherit font-inter overflow-hidden">
+      {/* ✅ Floating Dots Background */}
+      <FloatingDots />
 
-      {/* ✅ Game Over Screen with Guaranteed Wider Score Card */}
-      {gameOver && (
-        <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-black via-purple-900 to-black z-50">
-          {/* ✅ Game Over Text */}
-          <h1
-            className="font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 drop-shadow-lg animate-pulse whitespace-nowrap"
-            style={{
-              fontSize: "40px",
-              lineHeight: "1.2",
-              textAlign: "center",
-              position: "absolute",
-              top: "22%",
-              width: "320px", // ✅ Ensures "Game Over" and card match in width
-            }}
-          >
-            GAME OVER
-          </h1>
-
-          {/* ✅ Score & High Score - Properly Wider Card */}
+      {/* ✅ Game Card Wrapper - Keeps everything centered and inside the game */}
+      <div className="relative flex flex-col items-center">
+        {/* ✅ Display Running Score inside the Game Card */}
+        {gameRunning && !gameOver && (
           <div
-            className="bg-[#1e1e2e] p-5 rounded-xl shadow-md flex flex-col items-center space-y-3 transition duration-300 hover:scale-105 hover:shadow-purple-500/50"
+            className={`absolute top-4 left-4 bg-[#1e1e2e] px-4 py-2 rounded-lg shadow-md border border-yellow-500 transition-opacity duration-500 ${
+              isFadingOut ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <p className="text-yellow-400 text-xl font-bold tracking-wide drop-shadow-md">
+              Score: {score}
+            </p>
+          </div>
+        )}
+
+        {/* ✅ Game Canvas & Card with a Modern Border */}
+        <div
+          className={`relative rounded-xl shadow-lg transition-opacity duration-700 ${
+            isFadingOut ? "opacity-0" : "opacity-100"
+          }`}
+          style={{
+            width: "480px",
+            height: "600px",
+            padding: "4px", // ✅ Adds space for the border
+            borderRadius: "16px", // ✅ Smooth rounded edges
+            border: "2px solid transparent", // ✅ Transparent border (base)
+            background:
+              "linear-gradient(#1e1e2e, #1e1e2e), radial-gradient(circle at top, #8b5cf6, #ec4899, #3b82f6)", // ✅ Gradient border effect
+            backgroundOrigin: "border-box",
+            backgroundClip: "padding-box, border-box",
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            width={480}
+            height={600}
+            className="rounded-lg shadow-inner w-full h-full"
+          />
+        </div>
+
+        {/* ✅ Game Over Screen with Modern Border */}
+        {gameOver && !isFadingOut && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-700 animate-fadeIn"
             style={{
-              position: "absolute",
-              top: "45%",
-              width: "220px", // ✅ Explicitly setting width so it matches "Game Over"
+              width: "480px",
+              height: "600px",
+              padding: "4px", // ✅ Adds space for the border
+              borderRadius: "16px", // ✅ Smooth rounded edges
+              border: "2px solid transparent", // ✅ Transparent border (base)
+              background:
+                "linear-gradient(#1e1e2e, #1e1e2e), radial-gradient(circle at top, #8b5cf6, #ec4899, #3b82f6)", // ✅ Gradient border effect
+              backgroundOrigin: "border-box",
+              backgroundClip: "padding-box, border-box",
             }}
           >
-            <table className="w-full text-lg font-semibold text-gray-300 border-separate border-spacing-y-3">
-              <tbody>
-                <tr className="border-b border-gray-600">
-                  <td className="py-2 text-left flex justify-between w-full">
-                    <span>Score</span>
-                    <span className="opacity-0 mx-4">|</span>{" "}
-                    {/* ✅ Imaginary Divider */}
-                    <span className="text-yellow-400">{score}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-2 text-left flex justify-between w-full">
-                    <span>High Score</span>
-                    <span className="opacity-0 mx-4">|</span>{" "}
-                    {/* ✅ Imaginary Divider */}
-                    <span className="text-pink-400">{highScore}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* ✅ Game Over Text */}
+            <h1
+              className="font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-500 drop-shadow-lg animate-pulse whitespace-nowrap"
+              style={{
+                fontSize: "40px",
+                lineHeight: "1.2",
+                textAlign: "center",
+              }}
+            >
+              GAME OVER
+            </h1>
+
+            {/* ✅ Score & High Score Card */}
+            <div
+              className="bg-[#181824] p-6 rounded-xl shadow-md flex flex-col items-center space-y-4 transition duration-300 hover:scale-105 hover:shadow-purple-500/50 mt-6"
+              style={{
+                width: "320px",
+              }}
+            >
+              <table className="w-full text-lg font-semibold text-gray-300 border-separate border-spacing-y-3">
+                <tbody>
+                  <tr className="border-b border-gray-600">
+                    <td className="py-2 text-left flex justify-between w-full">
+                      <span>Score</span>
+                      <span className="opacity-0 mx-4">|</span>
+                      <span className="text-yellow-400">{score}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 text-left flex justify-between w-full">
+                      <span>High Score</span>
+                      <span className="opacity-0 mx-4">|</span>
+                      <span className="text-pink-400">{highScore}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* ✅ Play Again Button - Now Inside the Card */}
+              <button
+                className="w-[180px] py-2 text-md font-semibold text-white bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-lg shadow-md hover:scale-105 hover:shadow-purple-500/50 transition-all duration-300"
+                onClick={() => {
+                  setGameRunning(true); // ✅ Restart game instantly
+                  resetGame(); // ✅ Reset all states properly
+                }}
+              >
+                Play Again
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ✅ Hide the "Start Game" button during transition & when game is running */}
       {!gameRunning && !gameOver && !isTransitioning && (
