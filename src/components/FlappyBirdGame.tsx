@@ -264,7 +264,7 @@ export default function FlappyBirdGame() {
 
       {/* ✅ Game Container - Holds both Game & Instructions Side by Side */}
       <div className="flex flex-row items-center gap-16">
-        {/* ✅ Enhanced Instructions Card - Matches Contact Page UI */}
+        {/* ✅ Enhanced Instructions Card - Now Includes "Back to Website" */}
         <div className="bg-[#181824] p-6 rounded-xl shadow-lg flex flex-col items-center space-y-6 transition duration-300 hover:shadow-purple-500/50 border border-purple-500/40 w-[320px]">
           {/* ✅ Instructions Title with Animated Underline */}
           <h2 className="text-2xl font-extrabold text-white tracking-wide text-center relative">
@@ -293,7 +293,7 @@ export default function FlappyBirdGame() {
             </tbody>
           </table>
 
-          {/* ✅ Play Button with Gradient & Hover Effects */}
+          {/* ✅ Start Game Button (Now Styled for Better Appearance) */}
           {!gameRunning && !gameOver && !isTransitioning && (
             <button
               className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white font-bold rounded-lg shadow-md hover:scale-105 hover:shadow-purple-500/50 transition-all duration-300"
@@ -305,8 +305,14 @@ export default function FlappyBirdGame() {
               Start Game
             </button>
           )}
-        </div>
 
+          {/* ✅ Back to Website Button - Now Inside Instructions Card */}
+          <Link href="/" passHref>
+            <button className="w-full px-6 py-3 bg-[#1e1e2e] text-white font-semibold rounded-lg shadow-md border border-purple-500 transition-all duration-300 hover:scale-105 hover:shadow-purple-500/50 mt-3">
+              ← Back to Website
+            </button>
+          </Link>
+        </div>
         {/* ✅ Game Card Wrapper - Keeps everything centered */}
         <div className="relative flex flex-col items-center">
           {/* ✅ Display Running Score inside the Game Card */}

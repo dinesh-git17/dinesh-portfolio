@@ -12,14 +12,15 @@ type FloatingDot = {
 };
 
 // Fixed size for all dots
-const DOT_SIZE = 6; // Fixed size in pixels
+const DOT_SIZE = 8; // Fixed size in pixels
 
 // Function to generate floating dots (client-side only)
 const generateFloatingDots = (numDots: number): FloatingDot[] => {
   return Array.from({ length: numDots }, (_, i) => ({
     id: i,
     size: DOT_SIZE, // ✅ Fixed size for all dots
-    color: Math.random() > 0.5 ? "bg-blue-300" : "bg-red-300",
+    color:
+      Math.random() > 0.5 ? "rgba(128, 0, 128, 0.8)" : "rgba(75, 0, 130, 0.8)", // ✅ Deep purple hues
     position: {
       top: `${Math.random() * 100}%`,
       left: `${Math.random() * 100}%`,
@@ -40,8 +41,9 @@ export default function FloatingDots() {
       {dots.map((dot) => (
         <motion.div
           key={dot.id}
-          className={`absolute rounded-full ${dot.color}`}
+          className="absolute rounded-full"
           style={{
+            backgroundColor: dot.color, // ✅ Apply deep purple hues
             width: `${dot.size}px`,
             height: `${dot.size}px`,
             top: dot.position.top,
