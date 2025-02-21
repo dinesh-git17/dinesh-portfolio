@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import FloatingDots from "@/components/FloatingDots";
+import Link from "next/link";
 
 // ✅ Define Pipe Type
 type Pipe = {
@@ -261,50 +262,71 @@ export default function FlappyBirdGame() {
       {/* ✅ Floating Dots Background */}
       <FloatingDots />
 
-      {/* ✅ Game Card Wrapper - Keeps everything centered and inside the game */}
-      <div className="relative flex flex-col items-center">
-        {/* ✅ Display Running Score inside the Game Card */}
-        {gameRunning && !gameOver && (
-          <div
-            className={`absolute top-4 left-4 bg-[#1e1e2e] px-4 py-2 rounded-lg shadow-md border border-yellow-500 transition-opacity duration-500 ${
-              isFadingOut ? "opacity-0" : "opacity-100"
-            }`}
-          >
-            <p className="text-yellow-400 text-xl font-bold tracking-wide drop-shadow-md">
-              Score: {score}
-            </p>
-          </div>
-        )}
+      {/* ✅ Game Container - Holds both Game & Instructions Side by Side */}
+      <div className="flex flex-row items-center gap-16">
+        {/* ✅ Enhanced Instructions Card - Matches Contact Page UI */}
+        <div className="bg-[#181824] p-6 rounded-xl shadow-lg flex flex-col items-center space-y-6 transition duration-300 hover:shadow-purple-500/50 border border-purple-500/40 w-[320px]">
+          {/* ✅ Instructions Title with Animated Underline */}
+          <h2 className="text-2xl font-extrabold text-white tracking-wide text-center relative">
+            Instructions
+            <span className="block w-24 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-full mt-2 mx-auto animate-pulse"></span>
+          </h2>
 
-        {/* ✅ Game Canvas & Card with a Modern Border */}
-        <div
-          className={`relative rounded-xl shadow-lg transition-opacity duration-700 ${
-            isFadingOut ? "opacity-0" : "opacity-100"
-          }`}
-          style={{
-            width: "480px",
-            height: "600px",
-            padding: "4px", // ✅ Adds space for the border
-            borderRadius: "16px", // ✅ Smooth rounded edges
-            border: "2px solid transparent", // ✅ Transparent border (base)
-            background:
-              "linear-gradient(#1e1e2e, #1e1e2e), radial-gradient(circle at top, #8b5cf6, #ec4899, #3b82f6)", // ✅ Gradient border effect
-            backgroundOrigin: "border-box",
-            backgroundClip: "padding-box, border-box",
-          }}
-        >
-          <canvas
-            ref={canvasRef}
-            width={480}
-            height={600}
-            className="rounded-lg shadow-inner w-full h-full"
-          />
+          {/* ✅ Instructions Table with Spaced Rows */}
+          <table className="w-full text-lg font-semibold text-gray-300 border-separate border-spacing-y-4">
+            <tbody>
+              <tr>
+                <td className="py-2 text-left opacity-80">🎯 Goal</td>
+                <td className="py-2 text-right text-white">Avoid obstacles</td>
+              </tr>
+              <tr>
+                <td className="py-2 text-left opacity-80">🕹️ Controls</td>
+                <td className="py-2 text-right">
+                  <span className="text-yellow-400 font-bold">Tap</span> /{" "}
+                  <span className="text-yellow-400 font-bold">Space</span>
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2 text-left opacity-80">🏆 High Score</td>
+                <td className="py-2 text-right text-pink-400">{highScore}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ✅ Play Button with Gradient & Hover Effects */}
+          {!gameRunning && !gameOver && !isTransitioning && (
+            <button
+              className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white font-bold rounded-lg shadow-md hover:scale-105 hover:shadow-purple-500/50 transition-all duration-300"
+              onClick={() => {
+                setGameRunning(true); // ✅ Ensure instant state update
+                resetGame(); // ✅ Reset game fully before rendering first frame
+              }}
+            >
+              Start Game
+            </button>
+          )}
         </div>
 
-        {/* ✅ Game Over Screen with Modern Border */}
-        {gameOver && !isFadingOut && (
+        {/* ✅ Game Card Wrapper - Keeps everything centered */}
+        <div className="relative flex flex-col items-center">
+          {/* ✅ Display Running Score inside the Game Card */}
+          {gameRunning && !gameOver && (
+            <div
+              className={`absolute top-4 left-4 bg-[#1e1e2e] px-4 py-2 rounded-lg shadow-md border border-yellow-500 transition-opacity duration-500 ${
+                isFadingOut ? "opacity-0" : "opacity-100"
+              }`}
+            >
+              <p className="text-yellow-400 text-xl font-bold tracking-wide drop-shadow-md">
+                Score: {score}
+              </p>
+            </div>
+          )}
+
+          {/* ✅ Game Canvas & Card with a Modern Border */}
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-700 animate-fadeIn"
+            className={`relative rounded-xl shadow-lg transition-opacity duration-700 ${
+              isFadingOut ? "opacity-0" : "opacity-100"
+            }`}
             style={{
               width: "480px",
               height: "600px",
@@ -317,71 +339,83 @@ export default function FlappyBirdGame() {
               backgroundClip: "padding-box, border-box",
             }}
           >
-            {/* ✅ Game Over Text */}
-            <h1
-              className="font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-500 drop-shadow-lg animate-pulse whitespace-nowrap"
-              style={{
-                fontSize: "40px",
-                lineHeight: "1.2",
-                textAlign: "center",
-              }}
-            >
-              GAME OVER
-            </h1>
+            <canvas
+              ref={canvasRef}
+              width={480}
+              height={600}
+              className="rounded-lg shadow-inner w-full h-full"
+            />
+          </div>
 
-            {/* ✅ Score & High Score Card */}
+          {/* ✅ Game Over Screen with Modern Border */}
+          {gameOver && !isFadingOut && (
             <div
-              className="bg-[#181824] p-6 rounded-xl shadow-md flex flex-col items-center space-y-4 transition duration-300 hover:scale-105 hover:shadow-purple-500/50 mt-6"
+              className="absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-700 animate-fadeIn"
               style={{
-                width: "320px",
+                width: "480px",
+                height: "600px",
+                padding: "4px", // ✅ Adds space for the border
+                borderRadius: "16px", // ✅ Smooth rounded edges
+                border: "2px solid transparent", // ✅ Transparent border (base)
+                background:
+                  "linear-gradient(#1e1e2e, #1e1e2e), radial-gradient(circle at top, #8b5cf6, #ec4899, #3b82f6)", // ✅ Gradient border effect
+                backgroundOrigin: "border-box",
+                backgroundClip: "padding-box, border-box",
               }}
             >
-              <table className="w-full text-lg font-semibold text-gray-300 border-separate border-spacing-y-3">
-                <tbody>
-                  <tr className="border-b border-gray-600">
-                    <td className="py-2 text-left flex justify-between w-full">
-                      <span>Score</span>
-                      <span className="opacity-0 mx-4">|</span>
-                      <span className="text-yellow-400">{score}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 text-left flex justify-between w-full">
-                      <span>High Score</span>
-                      <span className="opacity-0 mx-4">|</span>
-                      <span className="text-pink-400">{highScore}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* ✅ Play Again Button - Now Inside the Card */}
-              <button
-                className="w-[180px] py-2 text-md font-semibold text-white bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-lg shadow-md hover:scale-105 hover:shadow-purple-500/50 transition-all duration-300"
-                onClick={() => {
-                  setGameRunning(true); // ✅ Restart game instantly
-                  resetGame(); // ✅ Reset all states properly
+              {/* ✅ Game Over Text */}
+              <h1
+                className="font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-500 drop-shadow-lg animate-pulse whitespace-nowrap"
+                style={{
+                  fontSize: "40px",
+                  lineHeight: "1.2",
+                  textAlign: "center",
                 }}
               >
-                Play Again
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+                GAME OVER
+              </h1>
 
-      {/* ✅ Hide the "Start Game" button during transition & when game is running */}
-      {!gameRunning && !gameOver && !isTransitioning && (
-        <button
-          className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg hover:scale-105 transition transform"
-          onClick={() => {
-            setGameRunning(true); // ✅ Ensure instant state update
-            resetGame(); // ✅ Reset game fully before rendering first frame
-          }}
-        >
-          Start Game
-        </button>
-      )}
+              {/* ✅ Score & High Score Card */}
+              <div
+                className="bg-[#181824] p-6 rounded-xl shadow-md flex flex-col items-center space-y-4 transition duration-300 hover:scale-105 hover:shadow-purple-500/50 mt-6"
+                style={{
+                  width: "320px",
+                }}
+              >
+                <table className="w-full text-lg font-semibold text-gray-300 border-separate border-spacing-y-3">
+                  <tbody>
+                    <tr className="border-b border-gray-600">
+                      <td className="py-2 text-left flex justify-between w-full">
+                        <span>Score</span>
+                        <span className="opacity-0 mx-4">|</span>
+                        <span className="text-yellow-400">{score}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 text-left flex justify-between w-full">
+                        <span>High Score</span>
+                        <span className="opacity-0 mx-4">|</span>
+                        <span className="text-pink-400">{highScore}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* ✅ Play Again Button - Inside the Card */}
+                <button
+                  className="w-[180px] py-2 text-md font-semibold text-white bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-lg shadow-md hover:scale-105 hover:shadow-purple-500/50 transition-all duration-300"
+                  onClick={() => {
+                    setGameRunning(true); // ✅ Restart game instantly
+                    resetGame(); // ✅ Reset all states properly
+                  }}
+                >
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
