@@ -24,7 +24,6 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Improved Smooth Scrolling Function
   const handleScroll = (
     event: React.MouseEvent<HTMLAnchorElement, MouseEvent>,
     targetId: string
@@ -32,9 +31,13 @@ export default function Navbar() {
     event.preventDefault();
     const targetElement = document.getElementById(targetId);
     if (targetElement) {
-      targetElement.scrollIntoView({
+      const offset = 10; // Adjust this value for more spacing
+      const elementPosition =
+        targetElement.getBoundingClientRect().top + window.scrollY;
+
+      window.scrollTo({
+        top: elementPosition - offset,
         behavior: "smooth",
-        block: "start",
       });
     }
   };
@@ -88,14 +91,13 @@ export default function Navbar() {
               <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
             </a>
           </li>
-          <li className="group">
+          <li>
             <a
               href="/flappy-bird"
-              className="flex items-center gap-1 transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]"
+              className="flex items-center gap-1 text-white transition duration-300 hover:text-purple-400 hover:drop-shadow-[0_0_15px_rgba(192,132,252,1)]"
             >
               <FaGamepad className="text-purple-400" />
               Play Game
-              <span className="block h-0.5 w-0 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
             </a>
           </li>
         </ul>
