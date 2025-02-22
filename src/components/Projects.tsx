@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { FaCodeBranch, FaExternalLinkAlt, FaLaptopCode } from "react-icons/fa";
+import FloatingDots from "./FloatingDots"; // Importing FloatingDots component
 
 // Define the correct type for repositories
 interface Repository {
@@ -12,6 +13,7 @@ interface Repository {
   fork: boolean;
 }
 
+// AI-Generated Descriptions
 const generateAIDescription = (name: string): string => {
   const lowerName = name.toLowerCase();
   if (
@@ -84,6 +86,9 @@ const Projects = () => {
       id="projects"
       className="relative w-full min-h-screen flex flex-col items-center justify-center bg-inherit text-inherit font-inter overflow-hidden px-4 pt-12 md:pt-16"
     >
+      {/* Floating Dots Background */}
+      <FloatingDots />
+
       {/* Content Wrapper */}
       <div className="max-w-7xl mx-auto flex flex-col gap-6 items-center relative z-10 w-full justify-between">
         {/* Projects Header */}
@@ -137,30 +142,6 @@ const Projects = () => {
           </div>
         </div>
       </div>
-
-      {/* Tailwind Animation for Smoother Wiggle Effect */}
-      <style jsx global>{`
-        @keyframes wiggle {
-          0% {
-            transform: rotate(0deg);
-          }
-          25% {
-            transform: rotate(0.8deg);
-          }
-          50% {
-            transform: rotate(-0.8deg);
-          }
-          75% {
-            transform: rotate(0.8deg);
-          }
-          100% {
-            transform: rotate(0deg);
-          }
-        }
-        .animate-wiggle {
-          animation: wiggle 0.5s ease-in-out infinite alternate;
-        }
-      `}</style>
     </section>
   );
 };
