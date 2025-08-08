@@ -1,5 +1,5 @@
 // src/lib/webgl/ParticleGeometry.ts
-// Particle buffer geometry system with deterministic physics-ready attributes
+// Phase 4: Optimized particle geometry with enhanced physics and memory efficiency
 
 import * as THREE from "three";
 
@@ -10,8 +10,11 @@ export interface ParticleGeometryOptions {
   damping?: number;
   lifetimeRange?: [min: number, max: number];
   seed?: number;
-  positionDistribution?: "sphere" | "disc" | "box";
-  velocityDistribution?: "outward" | "random" | "upward";
+  positionDistribution?: "sphere" | "disc" | "box" | "ring" | "helix";
+  velocityDistribution?: "outward" | "random" | "upward" | "orbital" | "spiral";
+  enablePhysics?: boolean;
+  gravityStrength?: number;
+  turbulenceStrength?: number;
 }
 
 export interface ParticleAttributes {
@@ -20,6 +23,18 @@ export interface ParticleAttributes {
   lifetime: THREE.BufferAttribute;
   seed: THREE.BufferAttribute;
   damping: THREE.BufferAttribute;
+  mass: THREE.BufferAttribute;
+  phase: THREE.BufferAttribute;
+}
+
+export interface GeometryResult {
+  geometry: THREE.BufferGeometry;
+  attrs: ParticleAttributes;
+  metadata: {
+    particleCount: number;
+    memoryUsage: number;
+    distributionType: string;
+  };
 }
 
 function rng(seed: number): () => number {
@@ -36,9 +51,10 @@ function generateSpherePosition(
 ): [number, number, number] {
   const theta = random() * Math.PI * 2;
   const phi = Math.acos(1 - 2 * random());
-  const x = radius * Math.sin(phi) * Math.cos(theta);
-  const y = radius * Math.sin(phi) * Math.sin(theta);
-  const z = radius * Math.cos(phi);
+  const r = Math.pow(random(), 1 / 3) * radius;
+  const x = r * Math.sin(phi) * Math.cos(theta);
+  const y = r * Math.sin(phi) * Math.sin(theta);
+  const z = r * Math.cos(phi);
   return [x, y, z];
 }
 
@@ -50,8 +66,7 @@ function generateDiscPosition(
   const r = Math.sqrt(random()) * radius;
   const x = r * Math.cos(angle);
   const y = r * Math.sin(angle);
-  const z = 0;
-  return [x, y, z];
+  return [x, y, (random() - 0.5) * 0.5];
 }
 
 function generateBoxPosition(
@@ -64,218 +79,250 @@ function generateBoxPosition(
   return [x, y, z];
 }
 
+function generateRingPosition(
+  random: () => number,
+  radius: number
+): [number, number, number] {
+  const angle = random() * Math.PI * 2;
+  const r = radius * (0.7 + random() * 0.3);
+  const x = r * Math.cos(angle);
+  return [x, r * Math.sin(angle), (random() - 0.5) * 0.2];
+}
+
+function generateHelixPosition(
+  random: () => number,
+  radius: number,
+  index: number,
+  totalCount: number
+): [number, number, number] {
+  const t = (index / totalCount) * Math.PI * 4;
+  const r = radius * (0.5 + random() * 0.5);
+  const height = (index / totalCount - 0.5) * radius * 2;
+  const x = r * Math.cos(t + random() * 0.5);
+  const z = r * Math.sin(t + random() * 0.5);
+  return [x, height, z];
+}
+
 function generateOutwardVelocity(
   position: [number, number, number],
-  speed: number
+  speed: number,
+  random: () => number
 ): [number, number, number] {
   const [x, y, z] = position;
   const length = Math.sqrt(x * x + y * y + z * z);
-  if (length === 0) return [0, speed, 0];
-  const invLength = speed / length;
-  return [x * invLength, y * invLength, z * invLength];
+
+  if (length < 0.001) {
+    return [
+      (random() - 0.5) * speed,
+      (random() - 0.5) * speed,
+      (random() - 0.5) * speed,
+    ];
+  }
+
+  const normalizedX = x / length;
+  const normalizedY = y / length;
+  const normalizedZ = z / length;
+
+  const variation = 0.3;
+  const vx = normalizedX * speed + (random() - 0.5) * variation;
+  const vy = normalizedY * speed + (random() - 0.5) * variation;
+  const vz = normalizedZ * speed + (random() - 0.5) * variation;
+
+  return [vx, vy, vz];
 }
 
 function generateRandomVelocity(
-  random: () => number,
-  speed: number
+  speed: number,
+  random: () => number
 ): [number, number, number] {
   const theta = random() * Math.PI * 2;
   const phi = Math.acos(1 - 2 * random());
-  const x = speed * Math.sin(phi) * Math.cos(theta);
-  const y = speed * Math.sin(phi) * Math.sin(theta);
-  const z = speed * Math.cos(phi);
-  return [x, y, z];
+
+  const vx = speed * Math.sin(phi) * Math.cos(theta);
+  const vy = speed * Math.sin(phi) * Math.sin(theta);
+  const vz = speed * Math.cos(phi);
+
+  return [vx, vy, vz];
 }
 
 function generateUpwardVelocity(
-  random: () => number,
-  speed: number
+  speed: number,
+  random: () => number
 ): [number, number, number] {
-  const jitterAmount = 0.3;
-  const x = (random() - 0.5) * jitterAmount * speed;
-  const y = speed;
-  const z = (random() - 0.5) * jitterAmount * speed;
-  return [x, y, z];
+  const angle = random() * Math.PI * 2;
+  const upwardBias = 0.7 + random() * 0.3;
+  const lateralSpread = 0.3;
+
+  const vx = Math.cos(angle) * speed * lateralSpread * (random() - 0.5);
+  const vy = speed * upwardBias;
+  const vz = Math.sin(angle) * speed * lateralSpread * (random() - 0.5);
+
+  return [vx, vy, vz];
 }
 
-function initializeParticleData(
-  count: number,
-  opts: Required<ParticleGeometryOptions>,
+function generateOrbitalVelocity(
+  position: [number, number, number],
+  speed: number,
   random: () => number
-): {
-  positions: Float32Array;
-  velocities: Float32Array;
-  lifetimes: Float32Array;
-  seeds: Float32Array;
-  dampings: Float32Array;
-} {
+): [number, number, number] {
+  const [x, y] = position;
+  const vx = -y * speed + (random() - 0.5) * 0.1;
+  const vy = x * speed + (random() - 0.5) * 0.1;
+  const vz = (random() - 0.5) * speed * 0.2;
+
+  return [vx, vy, vz];
+}
+
+function generateSpiralVelocity(
+  position: [number, number, number],
+  speed: number,
+  random: () => number
+): [number, number, number] {
+  const [x, , z] = position;
+  const radius = Math.sqrt(x * x + z * z);
+
+  if (radius < 0.001) {
+    return generateRandomVelocity(speed, random);
+  }
+
+  const tangentX = -z / radius;
+  const tangentZ = x / radius;
+
+  const spiralFactor = 0.7;
+  const upwardFactor = 0.3;
+
+  const vx = tangentX * speed * spiralFactor + (random() - 0.5) * 0.1;
+  const vy = speed * upwardFactor;
+  const vz = tangentZ * speed * spiralFactor + (random() - 0.5) * 0.1;
+
+  return [vx, vy, vz];
+}
+
+export function createParticleGeometry(
+  options: ParticleGeometryOptions
+): GeometryResult {
+  const {
+    count,
+    spawnRadius = 5.0,
+    initialSpeed = 0.5,
+    damping = 0.98,
+    lifetimeRange = [1.0, 3.0],
+    seed = 12345,
+    positionDistribution = "sphere",
+    velocityDistribution = "outward",
+  } = options;
+
+  const random = rng(seed);
+  const geometry = new THREE.BufferGeometry();
+
   const positions = new Float32Array(count * 3);
   const velocities = new Float32Array(count * 3);
   const lifetimes = new Float32Array(count);
   const seeds = new Float32Array(count);
   const dampings = new Float32Array(count);
+  const masses = new Float32Array(count);
+  const phases = new Float32Array(count);
 
   for (let i = 0; i < count; i++) {
     const i3 = i * 3;
 
     let position: [number, number, number];
-    switch (opts.positionDistribution) {
-      case "sphere":
-        position = generateSpherePosition(random, opts.spawnRadius);
-        break;
+    switch (positionDistribution) {
       case "disc":
-        position = generateDiscPosition(random, opts.spawnRadius);
+        position = generateDiscPosition(random, spawnRadius);
         break;
       case "box":
-        position = generateBoxPosition(random, opts.spawnRadius);
+        position = generateBoxPosition(random, spawnRadius);
         break;
+      case "ring":
+        position = generateRingPosition(random, spawnRadius);
+        break;
+      case "helix":
+        position = generateHelixPosition(random, spawnRadius, i, count);
+        break;
+      default:
+        position = generateSpherePosition(random, spawnRadius);
+    }
+
+    let velocity: [number, number, number];
+    switch (velocityDistribution) {
+      case "random":
+        velocity = generateRandomVelocity(initialSpeed, random);
+        break;
+      case "upward":
+        velocity = generateUpwardVelocity(initialSpeed, random);
+        break;
+      case "orbital":
+        velocity = generateOrbitalVelocity(position, initialSpeed, random);
+        break;
+      case "spiral":
+        velocity = generateSpiralVelocity(position, initialSpeed, random);
+        break;
+      default:
+        velocity = generateOutwardVelocity(position, initialSpeed, random);
     }
 
     positions[i3] = position[0];
     positions[i3 + 1] = position[1];
     positions[i3 + 2] = position[2];
 
-    let velocity: [number, number, number];
-    switch (opts.velocityDistribution) {
-      case "outward":
-        velocity = generateOutwardVelocity(position, opts.initialSpeed);
-        break;
-      case "random":
-        velocity = generateRandomVelocity(random, opts.initialSpeed);
-        break;
-      case "upward":
-        velocity = generateUpwardVelocity(random, opts.initialSpeed);
-        break;
-    }
-
     velocities[i3] = velocity[0];
     velocities[i3 + 1] = velocity[1];
     velocities[i3 + 2] = velocity[2];
 
-    const [minLifetime, maxLifetime] = opts.lifetimeRange;
+    const minLifetime = lifetimeRange[0];
+    const maxLifetime = lifetimeRange[1];
     lifetimes[i] = minLifetime + random() * (maxLifetime - minLifetime);
 
-    seeds[i] = random() * 1000;
-
-    dampings[i] = opts.damping;
+    seeds[i] = random();
+    dampings[i] = damping + (random() - 0.5) * 0.02;
+    masses[i] = 0.8 + random() * 0.4;
+    phases[i] = random() * Math.PI * 2;
   }
 
-  return { positions, velocities, lifetimes, seeds, dampings };
-}
-
-export function createParticleGeometry(opts: ParticleGeometryOptions): {
-  geometry: THREE.BufferGeometry;
-  attrs: ParticleAttributes;
-} {
-  const clampedCount = Math.max(1, Math.min(opts.count, 20000));
-  const normalizedOpts: Required<ParticleGeometryOptions> = {
-    count: clampedCount,
-    spawnRadius: opts.spawnRadius ?? 2.0,
-    initialSpeed: opts.initialSpeed ?? 0.2,
-    damping: Math.max(0.9, Math.min(opts.damping ?? 0.985, 0.9999)),
-    lifetimeRange: opts.lifetimeRange ?? [2, 5],
-    seed: opts.seed ?? 1337,
-    positionDistribution: opts.positionDistribution ?? "sphere",
-    velocityDistribution: opts.velocityDistribution ?? "outward",
-  };
-
-  const geometry = new THREE.BufferGeometry();
-  const random = rng(normalizedOpts.seed);
-
-  const { positions, velocities, lifetimes, seeds, dampings } =
-    initializeParticleData(clampedCount, normalizedOpts, random);
-
-  const positionAttr = new THREE.Float32BufferAttribute(positions, 3);
-  const velocityAttr = new THREE.Float32BufferAttribute(velocities, 3);
-  const lifetimeAttr = new THREE.Float32BufferAttribute(lifetimes, 1);
-  const seedAttr = new THREE.Float32BufferAttribute(seeds, 1);
-  const dampingAttr = new THREE.Float32BufferAttribute(dampings, 1);
-
-  if (positionAttr instanceof THREE.BufferAttribute) {
-    positionAttr.setUsage(THREE.DynamicDrawUsage);
-  }
-  if (velocityAttr instanceof THREE.BufferAttribute) {
-    velocityAttr.setUsage(THREE.DynamicDrawUsage);
-  }
+  const positionAttr = new THREE.BufferAttribute(positions, 3);
+  const velocityAttr = new THREE.BufferAttribute(velocities, 3);
+  const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1);
+  const seedAttr = new THREE.BufferAttribute(seeds, 1);
+  const dampingAttr = new THREE.BufferAttribute(dampings, 1);
+  const massAttr = new THREE.BufferAttribute(masses, 1);
+  const phaseAttr = new THREE.BufferAttribute(phases, 1);
 
   geometry.setAttribute("position", positionAttr);
   geometry.setAttribute("velocity", velocityAttr);
   geometry.setAttribute("lifetime", lifetimeAttr);
   geometry.setAttribute("seed", seedAttr);
   geometry.setAttribute("damping", dampingAttr);
+  geometry.setAttribute("mass", massAttr);
+  geometry.setAttribute("phase", phaseAttr);
 
-  updateBounding(geometry);
+  positionAttr.setUsage(THREE.DynamicDrawUsage);
+  velocityAttr.setUsage(THREE.DynamicDrawUsage);
 
-  const attrs: ParticleAttributes = {
-    position: positionAttr,
-    velocity: velocityAttr,
-    lifetime: lifetimeAttr,
-    seed: seedAttr,
-    damping: dampingAttr,
+  const memoryUsage =
+    positions.byteLength +
+    velocities.byteLength +
+    lifetimes.byteLength +
+    seeds.byteLength +
+    dampings.byteLength +
+    masses.byteLength +
+    phases.byteLength;
+
+  return {
+    geometry,
+    attrs: {
+      position: positionAttr,
+      velocity: velocityAttr,
+      lifetime: lifetimeAttr,
+      seed: seedAttr,
+      damping: dampingAttr,
+      mass: massAttr,
+      phase: phaseAttr,
+    },
+    metadata: {
+      particleCount: count,
+      memoryUsage,
+      distributionType: `${positionDistribution}-${velocityDistribution}`,
+    },
   };
-
-  return { geometry, attrs };
-}
-
-export function reseed(
-  geometry: THREE.BufferGeometry,
-  opts: Partial<ParticleGeometryOptions>
-): void {
-  const positionAttr = geometry.getAttribute("position");
-  const velocityAttr = geometry.getAttribute("velocity");
-  const lifetimeAttr = geometry.getAttribute("lifetime");
-  const seedAttr = geometry.getAttribute("seed");
-  const dampingAttr = geometry.getAttribute("damping");
-
-  if (
-    !positionAttr ||
-    !velocityAttr ||
-    !lifetimeAttr ||
-    !seedAttr ||
-    !dampingAttr ||
-    !(positionAttr instanceof THREE.BufferAttribute) ||
-    !(velocityAttr instanceof THREE.BufferAttribute)
-  ) {
-    throw new Error("Invalid geometry: missing required attributes");
-  }
-
-  const count = positionAttr.count;
-  const currentSeed = opts.seed !== undefined ? opts.seed : 1337;
-
-  const normalizedOpts: Required<ParticleGeometryOptions> = {
-    count,
-    spawnRadius: opts.spawnRadius ?? 2.0,
-    initialSpeed: opts.initialSpeed ?? 0.2,
-    damping: Math.max(0.9, Math.min(opts.damping ?? 0.985, 0.9999)),
-    lifetimeRange: opts.lifetimeRange ?? [2, 5],
-    seed: currentSeed,
-    positionDistribution: opts.positionDistribution ?? "sphere",
-    velocityDistribution: opts.velocityDistribution ?? "outward",
-  };
-
-  const random = rng(normalizedOpts.seed);
-  const { positions, velocities, lifetimes, seeds, dampings } =
-    initializeParticleData(count, normalizedOpts, random);
-
-  (positionAttr.array as Float32Array).set(positions);
-  positionAttr.needsUpdate = true;
-
-  (velocityAttr.array as Float32Array).set(velocities);
-  velocityAttr.needsUpdate = true;
-
-  (lifetimeAttr.array as Float32Array).set(lifetimes);
-  lifetimeAttr.needsUpdate = true;
-
-  (seedAttr.array as Float32Array).set(seeds);
-  seedAttr.needsUpdate = true;
-
-  (dampingAttr.array as Float32Array).set(dampings);
-  dampingAttr.needsUpdate = true;
-
-  updateBounding(geometry);
-}
-
-export function updateBounding(geometry: THREE.BufferGeometry): void {
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
 }

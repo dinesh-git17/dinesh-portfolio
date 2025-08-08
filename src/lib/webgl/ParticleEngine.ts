@@ -1,5 +1,5 @@
 // src/lib/webgl/ParticleEngine.ts
-// Enhanced particle engine with integrated geometry, shaders, and mouse interaction
+// Phase 4: Performance optimized particle engine with advanced rendering features
 
 import * as THREE from "three";
 import {
@@ -25,6 +25,9 @@ export interface ParticleEngineOptions {
   isLowPowerDevice?: boolean;
   geometryOptions?: Partial<ParticleGeometryOptions>;
   mouseOptions?: MouseInteractionOptions;
+  enableLOD?: boolean;
+  cullingDistance?: number;
+  adaptiveRendering?: boolean;
 }
 
 interface EngineState {
@@ -32,6 +35,8 @@ interface EngineState {
   disposed: boolean;
   animationId: number | null;
   lastTime: number;
+  frameCount: number;
+  performanceLevel: "high" | "medium" | "low";
 }
 
 export class ParticleEngine {
@@ -49,12 +54,23 @@ export class ParticleEngine {
   } | null = null;
   private mouseInteraction: MouseInteraction | null = null;
   private clock: THREE.Clock;
+  private frustum: THREE.Frustum;
+  private cameraMatrix: THREE.Matrix4;
 
   private state: EngineState = {
     initialized: false,
     disposed: false,
     animationId: null,
     lastTime: 0,
+    frameCount: 0,
+    performanceLevel: "high",
+  };
+
+  private performanceMonitor = {
+    frameTime: 0,
+    averageFrameTime: 16.67,
+    frameTimes: [] as number[],
+    lastOptimization: 0,
   };
 
   constructor(options: ParticleEngineOptions = {}) {
@@ -74,74 +90,152 @@ export class ParticleEngine {
       ),
       deterministicSeed: options.deterministicSeed ?? 12345,
       isLowPowerDevice: options.isLowPowerDevice ?? false,
+      enableLOD: options.enableLOD ?? true,
+      cullingDistance: options.cullingDistance ?? 50.0,
+      adaptiveRendering: options.adaptiveRendering ?? true,
     };
 
     this.geometryOptions = {
       count: this.options.particleCount,
+      spawnRadius: 6.0,
+      initialSpeed: this.options.isLowPowerDevice ? 0.3 : 0.5,
+      damping: 0.985,
+      lifetimeRange: [0.7, 1.0],
       seed: this.options.deterministicSeed,
-      spawnRadius: 5.0,
-      initialSpeed: 0.5,
-      damping: 0.98,
-      lifetimeRange: [0.8, 1.0],
       positionDistribution: "sphere",
       velocityDistribution: "outward",
       ...options.geometryOptions,
     };
 
     this.mouseOptions = {
-      radius: 1.5,
-      strength: this.options.attractionStrength,
+      radius: this.options.isLowPowerDevice ? 1.0 : 1.5,
+      strength: this.options.isLowPowerDevice ? 0.3 : 0.5,
       throttle: this.options.isLowPowerDevice,
+      enableGestures: !this.options.isLowPowerDevice,
+      dampingFactor: 0.85,
       ...options.mouseOptions,
     };
 
     this.clock = new THREE.Clock();
+    this.frustum = new THREE.Frustum();
+    this.cameraMatrix = new THREE.Matrix4();
   }
 
   init(
     scene: THREE.Scene,
-    camera: THREE.Camera,
-    domElement: HTMLElement
+    camera?: THREE.Camera,
+    domElement?: HTMLElement
   ): void {
     if (this.state.initialized) {
       console.warn("ParticleEngine already initialized");
       return;
-    }
-    if (this.state.disposed) {
-      throw new Error("Cannot reinitialize disposed ParticleEngine");
     }
 
     try {
       this.createGeometry();
       this.createMaterial();
       this.createPoints();
-      this.setupMouseInteraction(camera, domElement);
 
       if (this.points) {
         scene.add(this.points);
       }
 
+      if (camera && domElement) {
+        this.setupMouseInteraction(camera, domElement);
+      }
+
       this.state.initialized = true;
       this.clock.start();
+
+      console.log(
+        `ParticleEngine initialized with ${this.options.particleCount} particles`
+      );
     } catch (error) {
-      console.error("ParticleEngine initialization failed:", error);
+      console.error("Failed to initialize ParticleEngine:", error);
       this.dispose();
       throw error;
     }
   }
 
-  update(_deltaTime?: number): void {
-    void _deltaTime; // Explicitly mark as used to satisfy ESLint
-
+  update(deltaTime: number): void {
     if (!this.state.initialized || this.state.disposed || !this.uniforms) {
       return;
     }
 
+    const clampedDelta = Math.min(deltaTime, 0.033);
     const elapsed = this.clock.getElapsedTime();
 
+    this.updatePerformanceMonitoring(clampedDelta);
     this.updateUniforms(elapsed);
     this.updateMouseInteraction();
+
+    if (this.options.adaptiveRendering) {
+      this.adaptiveQualityControl();
+    }
+
     this.markAttributesForUpdate();
+    this.state.frameCount++;
+  }
+
+  private updatePerformanceMonitoring(deltaTime: number): void {
+    const frameTime = deltaTime * 1000;
+    this.performanceMonitor.frameTime = frameTime;
+    this.performanceMonitor.frameTimes.push(frameTime);
+
+    if (this.performanceMonitor.frameTimes.length > 60) {
+      this.performanceMonitor.frameTimes.shift();
+    }
+
+    if (this.performanceMonitor.frameTimes.length >= 60) {
+      const avg =
+        this.performanceMonitor.frameTimes.reduce((a, b) => a + b, 0) / 60;
+      this.performanceMonitor.averageFrameTime = avg;
+    }
+  }
+
+  private adaptiveQualityControl(): void {
+    const now = performance.now();
+    const avgFrameTime = this.performanceMonitor.averageFrameTime;
+
+    if (now - this.performanceMonitor.lastOptimization < 2000) {
+      return;
+    }
+
+    if (avgFrameTime > 20 && this.state.performanceLevel !== "low") {
+      this.degradeQuality();
+      this.performanceMonitor.lastOptimization = now;
+    } else if (avgFrameTime < 12 && this.state.performanceLevel !== "high") {
+      this.improveQuality();
+      this.performanceMonitor.lastOptimization = now;
+    }
+  }
+
+  private degradeQuality(): void {
+    if (this.state.performanceLevel === "high") {
+      this.state.performanceLevel = "medium";
+      this.setPointSize(this.options.pointSize * 0.8);
+      this.setNoiseStrength(this.options.noiseStrength * 0.7);
+    } else if (this.state.performanceLevel === "medium") {
+      this.state.performanceLevel = "low";
+      this.setPointSize(this.options.pointSize * 0.6);
+      this.setNoiseStrength(this.options.noiseStrength * 0.5);
+    }
+
+    console.log(`Quality degraded to: ${this.state.performanceLevel}`);
+  }
+
+  private improveQuality(): void {
+    if (this.state.performanceLevel === "low") {
+      this.state.performanceLevel = "medium";
+      this.setPointSize(this.options.pointSize * 0.8);
+      this.setNoiseStrength(this.options.noiseStrength * 0.7);
+    } else if (this.state.performanceLevel === "medium") {
+      this.state.performanceLevel = "high";
+      this.setPointSize(this.options.pointSize);
+      this.setNoiseStrength(this.options.noiseStrength);
+    }
+
+    console.log(`Quality improved to: ${this.state.performanceLevel}`);
   }
 
   resize(viewport: { width: number; height: number; dpr?: number }): void {
@@ -183,10 +277,22 @@ export class ParticleEngine {
 
     this.state.disposed = true;
     this.state.initialized = false;
+
+    console.log("ParticleEngine disposed");
   }
 
   get particlePoints(): THREE.Points | null {
     return this.points;
+  }
+
+  get performanceStats() {
+    return {
+      frameTime: this.performanceMonitor.frameTime,
+      averageFrameTime: this.performanceMonitor.averageFrameTime,
+      particleCount: this.options.particleCount,
+      performanceLevel: this.state.performanceLevel,
+      frameCount: this.state.frameCount,
+    };
   }
 
   setMouseAttraction(enabled: boolean, position?: THREE.Vector2): void {
@@ -203,6 +309,24 @@ export class ParticleEngine {
       const noiseUniform = this.uniforms.uNoiseStrength;
       if (typeof noiseUniform.value === "number") {
         noiseUniform.value = enabled ? this.options.noiseStrength : 0;
+      }
+    }
+  }
+
+  setNoiseStrength(strength: number): void {
+    if (this.uniforms) {
+      const noiseUniform = this.uniforms.uNoiseStrength;
+      if (typeof noiseUniform.value === "number") {
+        noiseUniform.value = Math.max(0, Math.min(strength, 1));
+      }
+    }
+  }
+
+  setPointSize(size: number): void {
+    if (this.uniforms) {
+      const sizeUniform = this.uniforms.uPointSize;
+      if (typeof sizeUniform.value === "number") {
+        sizeUniform.value = Math.max(0.1, Math.min(size, 20));
       }
     }
   }
@@ -234,12 +358,21 @@ export class ParticleEngine {
       blending: THREE.AdditiveBlending,
       depthTest: true,
       depthWrite: false,
+      vertexColors: false,
     });
+
+    if (this.options.enableLOD) {
+      this.material.defines = {
+        ...this.material.defines,
+        USE_LOD: "1",
+      };
+    }
   }
 
   private createPoints(): void {
     if (!this.geometry || !this.material) return;
     this.points = new THREE.Points(this.geometry, this.material);
+    this.points.frustumCulled = true;
   }
 
   private setupMouseInteraction(
@@ -270,8 +403,16 @@ export class ParticleEngine {
 
     if (typeof attractionUniform.value === "number") {
       if (mouseData.isActive) {
+        const strengthMultiplier =
+          mouseData.gestureType === "press"
+            ? 1.5
+            : mouseData.gestureType === "drag"
+              ? 1.2
+              : 1.0;
         attractionUniform.value =
-          this.options.attractionStrength * mouseData.strength;
+          this.options.attractionStrength *
+          mouseData.strength *
+          strengthMultiplier;
       } else {
         attractionUniform.value = this.options.attractionStrength * 0.1;
       }
