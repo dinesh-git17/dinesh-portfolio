@@ -3,7 +3,11 @@
 
 "use client";
 
-import { heroContainerVariants } from "@/lib/animations/HeroAnimations";
+import {
+  fadeInUp,
+  heroContainerVariants,
+  textStaggerVariants,
+} from "@/lib/animations/HeroAnimations";
 import { heroContentConfig } from "@/lib/config/heroConfig";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -100,6 +104,7 @@ export default function HeroSection({
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-lg"
               as="h1"
               delay={prefersReducedMotion ? 0 : 0.2}
+              variants={prefersReducedMotion ? undefined : textStaggerVariants}
             />
 
             <AnimatedText
@@ -107,6 +112,7 @@ export default function HeroSection({
               className="text-lg sm:text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto drop-shadow-md"
               as="p"
               delay={prefersReducedMotion ? 0 : 0.4}
+              variants={prefersReducedMotion ? undefined : fadeInUp}
             />
           </div>
 

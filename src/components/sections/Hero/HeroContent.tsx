@@ -3,7 +3,14 @@
 
 "use client";
 
-import { motion, useReducedMotion, Variants } from "framer-motion";
+import {
+  ctaGroupVariants,
+  ctaItemVariants,
+  fadeInUp,
+  heroContainerVariants,
+  heroItemVariants,
+} from "@/lib/animations/HeroAnimations";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import React from "react";
 
@@ -22,59 +29,20 @@ export interface HeroContentProps {
   dense?: boolean;
 }
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.6,
-      ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.08,
-    },
-  },
-};
+function getCtaClasses(variant?: "primary" | "secondary"): string {
+  const baseClasses =
+    "inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
 
-const itemVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 24,
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      ease: [0.16, 1, 0.3, 1],
-    },
-  },
-};
+  if (variant === "secondary") {
+    return `${baseClasses} text-white border-2 border-white/20 hover:border-white/40 hover:bg-white/10 focus:ring-white/20`;
+  }
 
-const ctaGroupVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.4,
-      ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.06,
-    },
-  },
-};
+  return `${baseClasses} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-lg hover:shadow-xl`;
+}
 
-const ctaItemVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 16,
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.4,
-      ease: [0.16, 1, 0.3, 1],
-    },
-  },
-};
+function isExternalUrl(href: string): boolean {
+  return href.startsWith("http://") || href.startsWith("https://");
+}
 
 export default function HeroContent({
   headline,
@@ -94,24 +62,7 @@ export default function HeroContent({
 
   const spacingClasses = dense
     ? "space-y-4 md:space-y-6"
-    : "space-y-6 md:space-y-8";
-
-  const getCtaClasses = (
-    variant: "primary" | "secondary" = "primary"
-  ): string => {
-    const baseClasses =
-      "inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
-
-    if (variant === "primary") {
-      return `${baseClasses} bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-lg hover:shadow-xl`;
-    }
-
-    return `${baseClasses} border-2 border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 active:bg-gray-100`;
-  };
-
-  const isExternalUrl = (href: string): boolean => {
-    return href.startsWith("http") || href.startsWith("//");
-  };
+    : "space-y-6 md:space-y-8 lg:space-y-10";
 
   if (shouldReduceMotion) {
     return (
@@ -158,14 +109,14 @@ export default function HeroContent({
     <motion.section
       className={`max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 ${spacingClasses} ${alignmentClasses} ${className}`}
       aria-labelledby={headlineId}
-      variants={containerVariants}
+      variants={heroContainerVariants}
       initial="hidden"
       animate="visible"
     >
       <motion.h1
         id={headlineId}
         className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-gray-900"
-        variants={itemVariants}
+        variants={heroItemVariants}
       >
         {headline}
       </motion.h1>
@@ -173,7 +124,7 @@ export default function HeroContent({
       {subheadline && (
         <motion.p
           className="max-w-prose text-lg sm:text-xl text-gray-600 text-balance leading-relaxed"
-          variants={itemVariants}
+          variants={fadeInUp}
         >
           {subheadline}
         </motion.p>

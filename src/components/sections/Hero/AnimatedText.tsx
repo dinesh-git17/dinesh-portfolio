@@ -3,6 +3,7 @@
 
 "use client";
 
+import { wordVariants } from "@/lib/animations/HeroAnimations";
 import { motion, Variants } from "framer-motion";
 import type { JSX } from "react";
 import React, { useMemo } from "react";
@@ -15,6 +16,7 @@ export interface AnimatedTextProps {
   delay?: number;
   stagger?: number;
   className?: string;
+  variants?: Variants;
 }
 
 const AnimatedText: React.FC<AnimatedTextProps> = ({
@@ -25,6 +27,7 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   delay = 0,
   stagger = 0.1,
   className = "",
+  variants,
 }) => {
   const animationVariants = useMemo(
     () => ({
@@ -44,8 +47,12 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
     []
   );
 
-  const containerVariants: Variants = useMemo(
-    () => ({
+  const containerVariants: Variants = useMemo(() => {
+    if (variants) {
+      return variants;
+    }
+
+    return {
       initial: {},
       animate: {
         transition: {
@@ -53,12 +60,15 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
           staggerChildren: stagger,
         },
       },
-    }),
-    [delay, stagger]
-  );
+    };
+  }, [variants, delay, stagger]);
 
-  const itemVariants: Variants = useMemo(
-    () => ({
+  const itemVariants: Variants = useMemo(() => {
+    if (variants) {
+      return wordVariants;
+    }
+
+    return {
       initial: animationVariants[variant].initial,
       animate: {
         ...animationVariants[variant].animate,
@@ -67,9 +77,8 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
           ease: [0.25, 0.46, 0.45, 0.94],
         },
       },
-    }),
-    [variant, animationVariants]
-  );
+    };
+  }, [variant, animationVariants, variants]);
 
   const splitText = useMemo(() => {
     if (split === "letters") {
