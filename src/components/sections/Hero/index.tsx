@@ -1,142 +1,200 @@
 // src/components/sections/Hero/index.tsx
-// Hero Section component - Main container for portfolio hero with responsive layout and animation
+// MAIN Hero Section component with layout structure and responsive design
 
 "use client";
 
-import { motion, Variants } from "framer-motion";
-import React from "react";
+import {
+  ctaGroupVariants,
+  fadeInUp,
+  heroContainerVariants,
+  textStaggerVariants,
+} from "@/lib/animations/HeroAnimations";
+import { heroContentConfig } from "@/lib/config/heroConfig";
+import { detectDevicePerformanceSync } from "@/lib/performance/DeviceDetection";
+import { motion, useReducedMotion } from "framer-motion";
+import dynamic from "next/dynamic";
+import type { JSX } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import AnimatedText from "./AnimatedText";
+import HeroContent from "./HeroContent";
 
-interface HeroProps {
+const ParticleSystem = dynamic(() => import("./ParticleSystem"), {
+  ssr: false,
+  loading: () => null,
+});
+
+export interface HeroProps {
+  enableParticles?: boolean;
+  className?: string;
   heading?: string;
   subheading?: string;
   primaryCTAText?: string;
   primaryCTAHref?: string;
   secondaryCTAText?: string;
   secondaryCTAHref?: string;
-  enableParticles?: boolean;
-  className?: string;
 }
 
-interface CTAButton {
-  text: string;
-  href: string;
-  variant: "primary" | "secondary";
-}
-
-const Hero: React.FC<HeroProps> = ({
-  heading = "Dinesh Dawonauth",
-  subheading = "Full Stack Developer & Machine Learning Engineer crafting innovative digital experiences",
-  primaryCTAText = "View Projects",
-  primaryCTAHref = "/projects",
-  secondaryCTAText = "About Me",
-  secondaryCTAHref = "/about",
-  enableParticles = false,
+export default function Hero({
+  enableParticles = true,
   className = "",
-}) => {
-  const containerVariants: Variants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.8,
-        staggerChildren: 0.2,
-      },
-    },
-  };
+  heading,
+  subheading,
+  primaryCTAText,
+  primaryCTAHref,
+  secondaryCTAText,
+  secondaryCTAHref,
+}: HeroProps): JSX.Element {
+  const shouldReduceMotion = useReducedMotion();
+  const [isMounted, setIsMounted] = useState(false);
+  const [deviceTier, setDeviceTier] = useState<"low" | "medium" | "high">(
+    "medium"
+  );
 
-  const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.8,
-        ease: [0.16, 1, 0.3, 1],
-      },
-    },
-  };
+  useEffect(() => {
+    setIsMounted(true);
 
-  const ctaButtons: CTAButton[] = [
-    { text: primaryCTAText, href: primaryCTAHref, variant: "primary" },
-    { text: secondaryCTAText, href: secondaryCTAHref, variant: "secondary" },
-  ];
+    try {
+      const detection = detectDevicePerformanceSync();
+      setDeviceTier(detection.tier);
+    } catch (error) {
+      console.warn("Device detection failed:", error);
+    }
+  }, []);
+
+  const shouldShowParticles = useMemo(() => {
+    return enableParticles && isMounted && !shouldReduceMotion;
+  }, [enableParticles, isMounted, shouldReduceMotion]);
+
+  const containerVariants = useMemo(() => {
+    if (shouldReduceMotion) {
+      return {
+        initial: { opacity: 1 },
+        animate: { opacity: 1 },
+      };
+    }
+    return heroContainerVariants;
+  }, [shouldReduceMotion]);
+
+  const handleParticleEngineReady = useCallback(() => {
+    console.log("Particle engine initialized successfully");
+  }, []);
+
+  const ctaArray = useMemo(() => {
+    if (primaryCTAText || secondaryCTAText) {
+      return [
+        ...(primaryCTAText
+          ? [
+              {
+                label: primaryCTAText,
+                href: primaryCTAHref || "/projects",
+                variant: "primary" as const,
+                ariaLabel: `${primaryCTAText} - Navigate to projects`,
+              },
+            ]
+          : []),
+        ...(secondaryCTAText
+          ? [
+              {
+                label: secondaryCTAText,
+                href: secondaryCTAHref || "/about",
+                variant: "secondary" as const,
+                ariaLabel: `${secondaryCTAText} - Learn more about me`,
+              },
+            ]
+          : []),
+      ];
+    }
+
+    return [
+      {
+        label: heroContentConfig.primaryCTA.label,
+        href: heroContentConfig.primaryCTA.href,
+        variant: heroContentConfig.primaryCTA.variant as
+          | "primary"
+          | "secondary",
+        ariaLabel: heroContentConfig.primaryCTA.ariaLabel,
+      },
+      {
+        label: heroContentConfig.secondaryCTA.label,
+        href: heroContentConfig.secondaryCTA.href,
+        variant: heroContentConfig.secondaryCTA.variant as
+          | "primary"
+          | "secondary",
+        ariaLabel: heroContentConfig.secondaryCTA.ariaLabel,
+      },
+    ];
+  }, [primaryCTAText, primaryCTAHref, secondaryCTAText, secondaryCTAHref]);
+
+  const displayHeading = heading || heroContentConfig.headline;
+  const displaySubheading = subheading || heroContentConfig.subheadline;
 
   return (
     <section
-      className={`relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 ${className}`}
+      className={`relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 ${className}`}
+      role="banner"
       aria-label="Hero section"
     >
-      {enableParticles && (
+      {shouldShowParticles && (
         <div
-          className="absolute inset-0 z-0"
-          role="presentation"
+          className="absolute inset-0 -z-10 pointer-events-none"
           aria-hidden="true"
         >
-          <div id="particle-container" className="w-full h-full" />
+          <ParticleSystem
+            performanceTier={deviceTier}
+            enableInteraction={!shouldReduceMotion}
+            onEngineReady={handleParticleEngineReady}
+          />
         </div>
       )}
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-screen items-center justify-center">
+      <div
+        className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30 pointer-events-none"
+        aria-hidden="true"
+      />
+
+      <motion.div
+        className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+        variants={containerVariants}
+        initial="initial"
+        animate="animate"
+      >
+        <div className="flex flex-col items-center text-center space-y-8">
+          <div className="space-y-6">
+            <AnimatedText
+              text={displayHeading}
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-lg tracking-tight"
+              as="h1"
+              delay={shouldReduceMotion ? 0 : 0.2}
+              stagger={shouldReduceMotion ? 0 : 0.1}
+              variants={shouldReduceMotion ? undefined : textStaggerVariants}
+            />
+
+            <AnimatedText
+              text={displaySubheading}
+              className="text-lg sm:text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto drop-shadow-md leading-relaxed"
+              as="p"
+              delay={shouldReduceMotion ? 0 : 0.4}
+              stagger={shouldReduceMotion ? 0 : 0.05}
+              variants={shouldReduceMotion ? undefined : fadeInUp}
+            />
+          </div>
+
           <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="text-center max-w-4xl mx-auto"
+            variants={shouldReduceMotion ? {} : ctaGroupVariants}
+            initial="initial"
+            animate="animate"
+            className="pt-4"
           >
-            <motion.h1
-              variants={itemVariants}
-              className="mb-6 text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl"
-            >
-              {heading.split(" ").map((word, index) => (
-                <span key={index}>
-                  {index === heading.split(" ").length - 1 ? (
-                    <span className="gradient-text">{word}</span>
-                  ) : (
-                    word
-                  )}{" "}
-                </span>
-              ))}
-            </motion.h1>
-
-            <motion.p
-              variants={itemVariants}
-              className="mx-auto mb-8 max-w-2xl text-lg text-gray-300 sm:text-xl md:text-2xl leading-relaxed"
-            >
-              {subheading}
-            </motion.p>
-
-            <motion.div
-              variants={itemVariants}
-              className="flex flex-col gap-4 sm:flex-row sm:justify-center sm:gap-6"
-            >
-              {ctaButtons.map((button, index) => (
-                <a
-                  key={index}
-                  href={button.href}
-                  className={`
-                    inline-flex items-center justify-center
-                    rounded-full px-6 py-3 sm:px-8 sm:py-4
-                    text-base font-medium
-                    transition-all duration-300 ease-in-out
-                    hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2
-                    ${
-                      button.variant === "primary"
-                        ? "glass-effect text-white hover:bg-white/20 focus:ring-blue-500"
-                        : "border-2 border-accent-400 text-accent-400 hover:bg-accent-400 hover:text-gray-900 focus:ring-accent-500"
-                    }
-                  `}
-                  aria-label={`${button.text} - Navigate to ${button.href}`}
-                >
-                  {button.text}
-                </a>
-              ))}
-            </motion.div>
+            <HeroContent
+              headline=""
+              subheadline=""
+              ctas={ctaArray}
+              align="center"
+              dense={false}
+            />
           </motion.div>
         </div>
-      </div>
+      </motion.div>
     </section>
   );
-};
-
-export default Hero;
+}
