@@ -1,5 +1,40 @@
 // src/lib/config/heroConfig.ts
-// Centralized configuration constants for Hero Section including particle settings, animations, and breakpoints
+// Centralized configuration for Hero section content and settings
+
+export interface HeroContentConfig {
+  headline: string;
+  subheadline: string;
+  primaryCTA: {
+    label: string;
+    href: string;
+    variant: "primary" | "secondary";
+    ariaLabel?: string;
+  };
+  secondaryCTA: {
+    label: string;
+    href: string;
+    variant: "primary" | "secondary";
+    ariaLabel?: string;
+  };
+}
+
+export const heroContentConfig: HeroContentConfig = {
+  headline: "Build the Future with AI-Powered Solutions",
+  subheadline:
+    "Transform your business with cutting-edge artificial intelligence and machine learning technologies that drive innovation and accelerate growth.",
+  primaryCTA: {
+    label: "Get Started",
+    href: "/get-started",
+    variant: "primary",
+    ariaLabel: "Get started with AI solutions",
+  },
+  secondaryCTA: {
+    label: "View Demo",
+    href: "/demo",
+    variant: "secondary",
+    ariaLabel: "View product demonstration",
+  },
+};
 
 export const HERO_PARTICLE_CONFIG = {
   desktopCount: 500,
