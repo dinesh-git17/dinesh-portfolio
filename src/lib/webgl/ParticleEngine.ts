@@ -1,8 +1,19 @@
 // src/lib/webgl/ParticleEngine.ts
-// Framework-agnostic particle engine for WebGL rendering with Three.js
-// Provides deterministic physics simulation and GPU-optimized rendering
+// Enhanced particle engine with integrated geometry, shaders, and mouse interaction
 
 import * as THREE from "three";
+import {
+  MouseInteraction,
+  type MouseInteractionOptions,
+} from "./MouseInteraction";
+import {
+  createParticleGeometry,
+  type ParticleGeometryOptions,
+} from "./ParticleGeometry";
+import {
+  particleFragmentShader,
+  particleVertexShader,
+} from "./ParticleShaders";
 
 export interface ParticleEngineOptions {
   particleCount?: number;
@@ -12,28 +23,39 @@ export interface ParticleEngineOptions {
   attractionStrength?: number;
   deterministicSeed?: number;
   isLowPowerDevice?: boolean;
+  geometryOptions?: Partial<ParticleGeometryOptions>;
+  mouseOptions?: MouseInteractionOptions;
 }
 
-interface ParticleState {
-  positions: Float32Array;
-  velocities: Float32Array;
-  lifetimes: Float32Array;
-  seeds: Float32Array;
+interface EngineState {
+  initialized: boolean;
+  disposed: boolean;
+  animationId: number | null;
+  lastTime: number;
 }
 
 export class ParticleEngine {
-  private readonly options: Required<ParticleEngineOptions>;
+  private readonly options: Required<
+    Omit<ParticleEngineOptions, "geometryOptions" | "mouseOptions">
+  >;
+  private readonly geometryOptions: ParticleGeometryOptions;
+  private readonly mouseOptions: MouseInteractionOptions;
+
   private geometry: THREE.BufferGeometry | null = null;
   private material: THREE.ShaderMaterial | null = null;
   private points: THREE.Points | null = null;
-  private state: ParticleState | null = null;
-  private initialized = false;
-  private disposed = false;
-  private time = 0;
+  private uniforms: {
+    [uniform: string]: { value: number | THREE.Vector2 | THREE.Color };
+  } | null = null;
+  private mouseInteraction: MouseInteraction | null = null;
+  private clock: THREE.Clock;
 
-  private mousePosition = new THREE.Vector2(0, 0);
-  private enableMouseAttraction = false;
-  private enableNoise = false;
+  private state: EngineState = {
+    initialized: false,
+    disposed: false,
+    animationId: null,
+    lastTime: 0,
+  };
 
   constructor(options: ParticleEngineOptions = {}) {
     const defaultCount = (options.isLowPowerDevice ?? false) ? 250 : 500;
@@ -53,50 +75,98 @@ export class ParticleEngine {
       deterministicSeed: options.deterministicSeed ?? 12345,
       isLowPowerDevice: options.isLowPowerDevice ?? false,
     };
+
+    this.geometryOptions = {
+      count: this.options.particleCount,
+      seed: this.options.deterministicSeed,
+      spawnRadius: 5.0,
+      initialSpeed: 0.5,
+      damping: 0.98,
+      lifetimeRange: [0.8, 1.0],
+      positionDistribution: "sphere",
+      velocityDistribution: "outward",
+      ...options.geometryOptions,
+    };
+
+    this.mouseOptions = {
+      radius: 1.5,
+      strength: this.options.attractionStrength,
+      throttle: this.options.isLowPowerDevice,
+      ...options.mouseOptions,
+    };
+
+    this.clock = new THREE.Clock();
   }
 
-  init(scene: THREE.Scene): void {
-    if (this.initialized) {
+  init(
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+    domElement: HTMLElement
+  ): void {
+    if (this.state.initialized) {
       console.warn("ParticleEngine already initialized");
       return;
     }
-    if (this.disposed) {
+    if (this.state.disposed) {
       throw new Error("Cannot reinitialize disposed ParticleEngine");
     }
 
-    this.createGeometry();
-    this.createMaterial();
-    this.createPoints();
-    this.initializeParticleState();
+    try {
+      this.createGeometry();
+      this.createMaterial();
+      this.createPoints();
+      this.setupMouseInteraction(camera, domElement);
 
-    if (this.points) {
-      scene.add(this.points);
+      if (this.points) {
+        scene.add(this.points);
+      }
+
+      this.state.initialized = true;
+      this.clock.start();
+    } catch (error) {
+      console.error("ParticleEngine initialization failed:", error);
+      this.dispose();
+      throw error;
     }
-
-    this.initialized = true;
   }
 
-  update(dt: number): void {
-    if (!this.initialized || this.disposed || !this.state || !this.geometry) {
+  update(_deltaTime?: number): void {
+    void _deltaTime; // Explicitly mark as used to satisfy ESLint
+
+    if (!this.state.initialized || this.state.disposed || !this.uniforms) {
       return;
     }
 
-    this.time += dt;
-    this.updateParticles(dt);
-    this.updateUniforms();
+    const elapsed = this.clock.getElapsedTime();
+
+    this.updateUniforms(elapsed);
+    this.updateMouseInteraction();
     this.markAttributesForUpdate();
   }
 
   resize(viewport: { width: number; height: number; dpr?: number }): void {
-    if (!this.material) return;
+    if (!this.uniforms) return;
 
     const dpr = viewport.dpr ?? 1;
-    this.material.uniforms.uViewport.value.set(viewport.width, viewport.height);
-    this.material.uniforms.uPixelRatio.value = dpr;
+    const viewportUniform = this.uniforms.uViewport;
+    const pixelRatioUniform = this.uniforms.uPixelRatio;
+
+    if (viewportUniform.value instanceof THREE.Vector2) {
+      viewportUniform.value.set(viewport.width, viewport.height);
+    }
+
+    if (typeof pixelRatioUniform.value === "number") {
+      pixelRatioUniform.value = dpr;
+    }
   }
 
   dispose(): void {
-    if (this.disposed) return;
+    if (this.state.disposed) return;
+
+    if (this.mouseInteraction) {
+      this.mouseInteraction.dispose();
+      this.mouseInteraction = null;
+    }
 
     if (this.geometry) {
       this.geometry.dispose();
@@ -109,9 +179,10 @@ export class ParticleEngine {
     }
 
     this.points = null;
-    this.state = null;
-    this.disposed = true;
-    this.initialized = false;
+    this.uniforms = null;
+
+    this.state.disposed = true;
+    this.state.initialized = false;
   }
 
   get particlePoints(): THREE.Points | null {
@@ -119,114 +190,46 @@ export class ParticleEngine {
   }
 
   setMouseAttraction(enabled: boolean, position?: THREE.Vector2): void {
-    this.enableMouseAttraction = enabled;
-    if (enabled && position) {
-      this.mousePosition.copy(position);
+    if (this.mouseInteraction) {
+      this.mouseInteraction.setEnabled(enabled);
+      if (enabled && position) {
+        this.mouseInteraction.updatePointerPosition(position);
+      }
     }
   }
 
   setNoiseEnabled(enabled: boolean): void {
-    this.enableNoise = enabled;
+    if (this.uniforms) {
+      const noiseUniform = this.uniforms.uNoiseStrength;
+      if (typeof noiseUniform.value === "number") {
+        noiseUniform.value = enabled ? this.options.noiseStrength : 0;
+      }
+    }
   }
 
   private createGeometry(): void {
-    this.geometry = new THREE.BufferGeometry();
+    const result = createParticleGeometry(this.geometryOptions);
+    this.geometry = result.geometry;
 
-    const count = this.options.particleCount;
-    const positions = new Float32Array(count * 3);
-    const velocities = new Float32Array(count * 3);
-    const lifetimes = new Float32Array(count);
-    const seeds = new Float32Array(count);
-
-    this.geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3)
-    );
-    this.geometry.setAttribute(
-      "velocity",
-      new THREE.Float32BufferAttribute(velocities, 3)
-    );
-    this.geometry.setAttribute(
-      "lifetime",
-      new THREE.Float32BufferAttribute(lifetimes, 1)
-    );
-    this.geometry.setAttribute(
-      "seed",
-      new THREE.Float32BufferAttribute(seeds, 1)
-    );
-
-    const positionAttr = this.geometry.getAttribute("position");
-    const velocityAttr = this.geometry.getAttribute("velocity");
-
-    if (positionAttr instanceof THREE.BufferAttribute) {
-      positionAttr.setUsage(THREE.DynamicDrawUsage);
-    }
-    if (velocityAttr instanceof THREE.BufferAttribute) {
-      velocityAttr.setUsage(THREE.DynamicDrawUsage);
-    }
+    result.attrs.position.setUsage(THREE.DynamicDrawUsage);
+    result.attrs.velocity.setUsage(THREE.DynamicDrawUsage);
   }
 
   private createMaterial(): void {
-    const baseColor = new THREE.Color(this.options.baseColor);
+    this.uniforms = {
+      uTime: { value: 0 },
+      uPixelRatio: { value: 1 },
+      uViewport: { value: new THREE.Vector2(1920, 1080) },
+      uBaseColor: { value: new THREE.Color(this.options.baseColor) },
+      uPointSize: { value: this.options.pointSize },
+      uNoiseStrength: { value: this.options.noiseStrength },
+      uAttractionStrength: { value: this.options.attractionStrength },
+    } as { [uniform: string]: { value: number | THREE.Vector2 | THREE.Color } };
 
     this.material = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uPixelRatio: { value: 1 },
-        uViewport: { value: new THREE.Vector2(1920, 1080) },
-        uBaseColor: { value: baseColor },
-        uPointSize: { value: this.options.pointSize },
-        uNoiseStrength: { value: this.options.noiseStrength },
-        uAttractionStrength: { value: this.options.attractionStrength },
-      },
-      vertexShader: `
-        attribute float lifetime;
-        attribute float seed;
-        attribute vec3 velocity;
-        
-        uniform float uTime;
-        uniform float uPixelRatio;
-        uniform vec2 uViewport;
-        uniform float uPointSize;
-        
-        varying float vLifetime;
-        varying float vSeed;
-        
-        void main() {
-          vLifetime = lifetime;
-          vSeed = seed;
-          
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * mvPosition;
-          
-          float distanceScale = 1.0 / (-mvPosition.z);
-          float screenScale = min(uViewport.x, uViewport.y) / 1080.0;
-          
-          gl_PointSize = uPointSize * uPixelRatio * distanceScale * screenScale;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 uBaseColor;
-        
-        varying float vLifetime;
-        varying float vSeed;
-        
-        void main() {
-          vec2 center = gl_PointCoord - 0.5;
-          float distance = length(center);
-          
-          if (distance > 0.5) discard;
-          
-          float alpha = 1.0 - smoothstep(0.3, 0.5, distance);
-          alpha *= smoothstep(0.0, 0.1, vLifetime);
-          alpha *= smoothstep(1.0, 0.9, vLifetime);
-          
-          vec3 color = uBaseColor;
-          color += sin(vSeed * 6.28318) * 0.1;
-          
-          gl_FragColor = vec4(color, alpha * 0.8);
-        }
-      `,
+      uniforms: this.uniforms,
+      vertexShader: particleVertexShader,
+      fragmentShader: particleFragmentShader,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthTest: true,
@@ -239,136 +242,49 @@ export class ParticleEngine {
     this.points = new THREE.Points(this.geometry, this.material);
   }
 
-  private initializeParticleState(): void {
-    if (!this.geometry) return;
-
-    const count = this.options.particleCount;
-    const positions = new Float32Array(count * 3);
-    const velocities = new Float32Array(count * 3);
-    const lifetimes = new Float32Array(count);
-    const seeds = new Float32Array(count);
-
-    const rng = this.createSeededRNG(this.options.deterministicSeed);
-
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-
-      positions[i3] = (rng() - 0.5) * 20;
-      positions[i3 + 1] = (rng() - 0.5) * 20;
-      positions[i3 + 2] = (rng() - 0.5) * 20;
-
-      velocities[i3] = (rng() - 0.5) * 2;
-      velocities[i3 + 1] = (rng() - 0.5) * 2;
-      velocities[i3 + 2] = (rng() - 0.5) * 2;
-
-      lifetimes[i] = rng();
-      seeds[i] = rng() * 1000;
-    }
-
-    this.state = { positions, velocities, lifetimes, seeds };
-
-    const positionAttr = this.geometry.getAttribute("position");
-    const velocityAttr = this.geometry.getAttribute("velocity");
-    const lifetimeAttr = this.geometry.getAttribute("lifetime");
-    const seedAttr = this.geometry.getAttribute("seed");
-
-    (positionAttr.array as Float32Array).set(positions);
-    positionAttr.needsUpdate = true;
-
-    (velocityAttr.array as Float32Array).set(velocities);
-    velocityAttr.needsUpdate = true;
-
-    (lifetimeAttr.array as Float32Array).set(lifetimes);
-    lifetimeAttr.needsUpdate = true;
-
-    (seedAttr.array as Float32Array).set(seeds);
-    seedAttr.needsUpdate = true;
-  }
-
-  private updateParticles(dt: number): void {
-    if (!this.state) return;
-
-    const { positions, velocities, lifetimes, seeds } = this.state;
-    const count = this.options.particleCount;
-    const damping = 0.99;
-    const rng = this.createSeededRNG(
-      this.options.deterministicSeed + Math.floor(this.time * 1000)
+  private setupMouseInteraction(
+    camera: THREE.Camera,
+    domElement: HTMLElement
+  ): void {
+    this.mouseInteraction = new MouseInteraction(
+      camera,
+      domElement,
+      this.mouseOptions
     );
+  }
 
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
+  private updateUniforms(elapsed: number): void {
+    if (!this.uniforms) return;
 
-      positions[i3] += velocities[i3] * dt;
-      positions[i3 + 1] += velocities[i3 + 1] * dt;
-      positions[i3 + 2] += velocities[i3 + 2] * dt;
-
-      velocities[i3] *= damping;
-      velocities[i3 + 1] *= damping;
-      velocities[i3 + 2] *= damping;
-
-      if (this.enableNoise) {
-        const noiseScale = this.options.noiseStrength * dt;
-        velocities[i3] += Math.sin(this.time * 0.5 + seeds[i]) * noiseScale;
-        velocities[i3 + 1] += Math.cos(this.time * 0.7 + seeds[i]) * noiseScale;
-        velocities[i3 + 2] += Math.sin(this.time * 0.3 + seeds[i]) * noiseScale;
-      }
-
-      if (this.enableMouseAttraction) {
-        const dx = this.mousePosition.x - positions[i3];
-        const dy = this.mousePosition.y - positions[i3 + 1];
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance > 0.1) {
-          const force = (this.options.attractionStrength * dt) / (distance + 1);
-          velocities[i3] += dx * force;
-          velocities[i3 + 1] += dy * force;
-        }
-      }
-
-      lifetimes[i] -= dt * 0.2;
-
-      if (lifetimes[i] <= 0) {
-        positions[i3] = (rng() - 0.5) * 20;
-        positions[i3 + 1] = (rng() - 0.5) * 20;
-        positions[i3 + 2] = (rng() - 0.5) * 20;
-
-        velocities[i3] = (rng() - 0.5) * 2;
-        velocities[i3 + 1] = (rng() - 0.5) * 2;
-        velocities[i3 + 2] = (rng() - 0.5) * 2;
-
-        lifetimes[i] = 1;
-        seeds[i] = rng() * 1000;
-      }
+    const timeUniform = this.uniforms.uTime;
+    if (typeof timeUniform.value === "number") {
+      timeUniform.value = elapsed;
     }
   }
 
-  private updateUniforms(): void {
-    if (!this.material) return;
+  private updateMouseInteraction(): void {
+    if (!this.mouseInteraction || !this.uniforms) return;
 
-    this.material.uniforms.uTime.value = this.time;
-    this.material.uniforms.uNoiseStrength.value = this.enableNoise
-      ? this.options.noiseStrength
-      : 0;
-    this.material.uniforms.uAttractionStrength.value = this
-      .enableMouseAttraction
-      ? this.options.attractionStrength
-      : 0;
+    const mouseData = this.mouseInteraction.getInteractionData();
+    const attractionUniform = this.uniforms.uAttractionStrength;
+
+    if (typeof attractionUniform.value === "number") {
+      if (mouseData.isActive) {
+        attractionUniform.value =
+          this.options.attractionStrength * mouseData.strength;
+      } else {
+        attractionUniform.value = this.options.attractionStrength * 0.1;
+      }
+    }
   }
 
   private markAttributesForUpdate(): void {
     if (!this.geometry) return;
 
-    this.geometry.getAttribute("position").needsUpdate = true;
-    this.geometry.getAttribute("velocity").needsUpdate = true;
-    this.geometry.getAttribute("lifetime").needsUpdate = true;
-    this.geometry.getAttribute("seed").needsUpdate = true;
-  }
+    const positionAttr = this.geometry.getAttribute("position");
+    const velocityAttr = this.geometry.getAttribute("velocity");
 
-  private createSeededRNG(seed: number): () => number {
-    let state = seed;
-    return () => {
-      state = (state * 1664525 + 1013904223) % 2147483647;
-      return state / 2147483647;
-    };
+    if (positionAttr) positionAttr.needsUpdate = true;
+    if (velocityAttr) velocityAttr.needsUpdate = true;
   }
 }

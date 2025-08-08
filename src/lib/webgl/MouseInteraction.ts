@@ -1,5 +1,5 @@
 // src/lib/webgl/MouseInteraction.ts
-// Mouse and touch interaction handler for WebGL particle systems
+// Mouse and touch interaction handler for WebGL particle systems with optimized event handling
 
 import * as THREE from "three";
 
@@ -9,144 +9,264 @@ export interface MouseInteractionOptions {
   throttle?: boolean;
 }
 
-export class MouseInteraction {
-  private _camera: THREE.Camera;
-  private _domElement: HTMLElement;
-  private _opts: Required<MouseInteractionOptions>;
-  private _ndc: THREE.Vector2;
-  private _world: THREE.Vector3;
-  private _rafPending: boolean;
-  private _rafId: number | null;
+export interface InteractionData {
+  position: THREE.Vector2;
+  worldPosition: THREE.Vector3;
+  isActive: boolean;
+  strength: number;
+  velocity: THREE.Vector2;
+}
 
-  private _onPointerMove: (event: PointerEvent) => void;
-  private _onTouchMove: (event: TouchEvent) => void;
+export class MouseInteraction {
+  private camera: THREE.Camera;
+  private domElement: HTMLElement;
+  private options: Required<MouseInteractionOptions>;
+
+  private ndcPosition: THREE.Vector2;
+  private worldPosition: THREE.Vector3;
+  private lastPosition: THREE.Vector2;
+  private velocity: THREE.Vector2;
+  private isActive: boolean;
+  private strength: number;
+
+  private rafPending: boolean;
+  private rafId: number | null;
+  private enabled: boolean;
+
+  private boundHandlers: {
+    onPointerMove: (event: PointerEvent) => void;
+    onPointerDown: (event: PointerEvent) => void;
+    onPointerUp: (event: PointerEvent) => void;
+    onTouchMove: (event: TouchEvent) => void;
+    onTouchStart: (event: TouchEvent) => void;
+    onTouchEnd: (event: TouchEvent) => void;
+  };
 
   constructor(
     camera: THREE.Camera,
     domElement: HTMLElement,
-    opts: MouseInteractionOptions = {}
+    options: MouseInteractionOptions = {}
   ) {
-    this._camera = camera;
-    this._domElement = domElement;
-    this._opts = {
-      radius: opts.radius ?? 1.5,
-      strength: opts.strength ?? 0.5,
-      throttle: opts.throttle ?? true,
+    this.camera = camera;
+    this.domElement = domElement;
+    this.options = {
+      radius: options.radius ?? 1.5,
+      strength: options.strength ?? 0.5,
+      throttle: options.throttle ?? true,
     };
 
-    this._ndc = new THREE.Vector2();
-    this._world = new THREE.Vector3();
-    this._rafPending = false;
-    this._rafId = null;
+    this.ndcPosition = new THREE.Vector2(0, 0);
+    this.worldPosition = new THREE.Vector3(0, 0, 0);
+    this.lastPosition = new THREE.Vector2(0, 0);
+    this.velocity = new THREE.Vector2(0, 0);
+    this.isActive = false;
+    this.strength = 0;
+    this.rafPending = false;
+    this.rafId = null;
+    this.enabled = true;
 
-    this._onPointerMove = this._handlePointerMove.bind(this);
-    this._onTouchMove = this._handleTouchMove.bind(this);
-
-    if (typeof window !== "undefined") {
-      this._addEventListeners();
-    }
-  }
-
-  dispose(): void {
-    if (typeof window !== "undefined") {
-      this._removeEventListeners();
-    }
-
-    if (this._rafId !== null) {
-      cancelAnimationFrame(this._rafId);
-      this._rafId = null;
-    }
-
-    this._rafPending = false;
-  }
-
-  getMousePosition(): THREE.Vector2 {
-    return this._ndc.clone();
-  }
-
-  getWorldPosition(planeZ: number = 0): THREE.Vector3 {
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(this._ndc, this._camera);
-
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -planeZ);
-    const target = new THREE.Vector3();
-
-    raycaster.ray.intersectPlane(plane, target);
-    this._world.copy(target || new THREE.Vector3());
-
-    return this._world.clone();
-  }
-
-  getOptions(): Required<MouseInteractionOptions> {
-    return { ...this._opts };
-  }
-
-  setOptions(opts: Partial<MouseInteractionOptions>): void {
-    this._opts = {
-      ...this._opts,
-      ...opts,
-    };
-  }
-
-  private _addEventListeners(): void {
-    this._domElement.addEventListener("pointermove", this._onPointerMove, {
-      passive: true,
-    });
-    this._domElement.addEventListener("touchmove", this._onTouchMove, {
-      passive: true,
-    });
-  }
-
-  private _removeEventListeners(): void {
-    this._domElement.removeEventListener("pointermove", this._onPointerMove);
-    this._domElement.removeEventListener("touchmove", this._onTouchMove);
-  }
-
-  private _handlePointerMove(event: PointerEvent): void {
-    if (this._opts.throttle && this._rafPending) {
-      return;
-    }
-
-    const updatePosition = () => {
-      this._updateNDC(event.clientX, event.clientY);
-      this._rafPending = false;
-      this._rafId = null;
+    this.boundHandlers = {
+      onPointerMove: this.handlePointerMove.bind(this),
+      onPointerDown: this.handlePointerDown.bind(this),
+      onPointerUp: this.handlePointerUp.bind(this),
+      onTouchMove: this.handleTouchMove.bind(this),
+      onTouchStart: this.handleTouchStart.bind(this),
+      onTouchEnd: this.handleTouchEnd.bind(this),
     };
 
-    if (this._opts.throttle) {
-      this._rafPending = true;
-      this._rafId = requestAnimationFrame(updatePosition);
-    } else {
-      updatePosition();
-    }
+    this.attachEventListeners();
   }
 
-  private _handleTouchMove(event: TouchEvent): void {
-    if (event.touches.length === 0) return;
+  private attachEventListeners(): void {
+    this.domElement.addEventListener(
+      "pointermove",
+      this.boundHandlers.onPointerMove,
+      { passive: true }
+    );
+    this.domElement.addEventListener(
+      "pointerdown",
+      this.boundHandlers.onPointerDown,
+      { passive: true }
+    );
+    this.domElement.addEventListener(
+      "pointerup",
+      this.boundHandlers.onPointerUp,
+      { passive: true }
+    );
 
-    if (this._opts.throttle && this._rafPending) {
-      return;
-    }
+    this.domElement.addEventListener(
+      "touchmove",
+      this.boundHandlers.onTouchMove,
+      { passive: true }
+    );
+    this.domElement.addEventListener(
+      "touchstart",
+      this.boundHandlers.onTouchStart,
+      { passive: true }
+    );
+    this.domElement.addEventListener(
+      "touchend",
+      this.boundHandlers.onTouchEnd,
+      { passive: true }
+    );
+  }
 
+  private removeEventListeners(): void {
+    this.domElement.removeEventListener(
+      "pointermove",
+      this.boundHandlers.onPointerMove
+    );
+    this.domElement.removeEventListener(
+      "pointerdown",
+      this.boundHandlers.onPointerDown
+    );
+    this.domElement.removeEventListener(
+      "pointerup",
+      this.boundHandlers.onPointerUp
+    );
+
+    this.domElement.removeEventListener(
+      "touchmove",
+      this.boundHandlers.onTouchMove
+    );
+    this.domElement.removeEventListener(
+      "touchstart",
+      this.boundHandlers.onTouchStart
+    );
+    this.domElement.removeEventListener(
+      "touchend",
+      this.boundHandlers.onTouchEnd
+    );
+  }
+
+  private handlePointerMove(event: PointerEvent): void {
+    if (!this.enabled) return;
+    this.scheduleUpdate(() =>
+      this.updatePosition(event.clientX, event.clientY)
+    );
+  }
+
+  private handlePointerDown(event: PointerEvent): void {
+    if (!this.enabled) return;
+    this.isActive = true;
+    this.updatePosition(event.clientX, event.clientY);
+  }
+
+  private handlePointerUp(): void {
+    if (!this.enabled) return;
+    this.isActive = false;
+    this.strength = 0;
+  }
+
+  private handleTouchMove(event: TouchEvent): void {
+    if (!this.enabled || event.touches.length === 0) return;
     const touch = event.touches[0];
-    const updatePosition = () => {
-      this._updateNDC(touch.clientX, touch.clientY);
-      this._rafPending = false;
-      this._rafId = null;
-    };
+    this.scheduleUpdate(() =>
+      this.updatePosition(touch.clientX, touch.clientY)
+    );
+  }
 
-    if (this._opts.throttle) {
-      this._rafPending = true;
-      this._rafId = requestAnimationFrame(updatePosition);
-    } else {
-      updatePosition();
+  private handleTouchStart(event: TouchEvent): void {
+    if (!this.enabled || event.touches.length === 0) return;
+    this.isActive = true;
+    const touch = event.touches[0];
+    this.updatePosition(touch.clientX, touch.clientY);
+  }
+
+  private handleTouchEnd(): void {
+    if (!this.enabled) return;
+    this.isActive = false;
+    this.strength = 0;
+  }
+
+  private scheduleUpdate(updateFn: () => void): void {
+    if (!this.options.throttle) {
+      updateFn();
+      return;
+    }
+
+    if (this.rafPending) return;
+
+    this.rafPending = true;
+    this.rafId = requestAnimationFrame(() => {
+      updateFn();
+      this.rafPending = false;
+      this.rafId = null;
+    });
+  }
+
+  private updatePosition(clientX: number, clientY: number): void {
+    const rect = this.domElement.getBoundingClientRect();
+
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    const currentPosition = new THREE.Vector2(x, y);
+
+    this.velocity.subVectors(currentPosition, this.lastPosition);
+    this.lastPosition.copy(currentPosition);
+    this.ndcPosition.copy(currentPosition);
+
+    this.updateWorldPosition();
+    this.updateStrength();
+  }
+
+  private updateWorldPosition(): void {
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(this.ndcPosition, this.camera);
+
+    const distance = 10;
+    this.worldPosition
+      .copy(raycaster.ray.direction)
+      .multiplyScalar(distance)
+      .add(raycaster.ray.origin);
+  }
+
+  private updateStrength(): void {
+    if (!this.isActive) {
+      this.strength = Math.max(0, this.strength - 0.05);
+      return;
+    }
+
+    const velocityMagnitude = this.velocity.length();
+    const targetStrength = Math.min(1, velocityMagnitude * 10 + 0.3);
+
+    this.strength = THREE.MathUtils.lerp(this.strength, targetStrength, 0.1);
+  }
+
+  public updatePointerPosition(position: THREE.Vector2): void {
+    this.ndcPosition.copy(position);
+    this.updateWorldPosition();
+  }
+
+  public setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.isActive = false;
+      this.strength = 0;
     }
   }
 
-  private _updateNDC(clientX: number, clientY: number): void {
-    const rect = this._domElement.getBoundingClientRect();
+  public getInteractionData(): InteractionData {
+    return {
+      position: this.ndcPosition.clone(),
+      worldPosition: this.worldPosition.clone(),
+      isActive: this.isActive,
+      strength: this.strength,
+      velocity: this.velocity.clone(),
+    };
+  }
 
-    this._ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    this._ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  public dispose(): void {
+    this.removeEventListeners();
+
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+
+    this.enabled = false;
+    this.isActive = false;
+    this.rafPending = false;
   }
 }
